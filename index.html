@@ -2,27 +2,36 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NewsOps Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NewsOps Enterprise Dashboard</title>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
+
 :root{
   --bg:#0d1117;
-  --bg2:#161b22;
-  --bg3:#21262d;
+  --card:#161b22;
+  --card2:#1f2937;
   --border:#30363d;
   --text:#e6edf3;
   --muted:#8b949e;
-  --accent:#7c3aed;
-  --green:#2ea043;
-  --yellow:#d29922;
-  --red:#f85149;
+  --purple:#7c3aed;
+  --green:#16a34a;
+  --yellow:#d97706;
+  --red:#dc2626;
+  --blue:#2563eb;
 }
 
-*{margin:0;padding:0;box-sizing:border-box}
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
+
 body{
   background:var(--bg);
   color:var(--text);
@@ -30,64 +39,113 @@ body{
 }
 
 .topbar{
-  height:60px;
+  height:70px;
+  background:#111827;
+  border-bottom:1px solid var(--border);
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding:0 20px;
-  border-bottom:1px solid var(--border);
-  background:var(--bg2);
+  padding:0 25px;
+  position:sticky;
+  top:0;
+  z-index:999;
 }
 
 .logo{
-  font-size:18px;
-  font-weight:700;
+  font-size:22px;
+  font-weight:800;
 }
 
 .live{
   background:var(--red);
-  color:#fff;
-  padding:4px 10px;
-  border-radius:20px;
-  font-size:11px;
+  padding:6px 14px;
+  border-radius:30px;
+  font-size:12px;
   font-weight:700;
 }
 
-.main{
+.container{
   padding:20px;
+}
+
+.tabs{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-bottom:20px;
+}
+
+.tab-btn{
+  padding:10px 18px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:10px;
+  cursor:pointer;
+  color:white;
+  font-weight:600;
+}
+
+.tab-btn.active{
+  background:var(--purple);
+}
+
+.tab-content{
+  display:none;
+}
+
+.tab-content.active{
+  display:block;
 }
 
 .grid{
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
-  gap:16px;
+  grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+  gap:18px;
 }
 
 .card{
-  background:var(--bg2);
+  background:var(--card);
   border:1px solid var(--border);
-  border-radius:12px;
-  padding:16px;
+  border-radius:16px;
+  padding:18px;
 }
 
 .card h3{
-  margin-bottom:12px;
   font-size:15px;
+  margin-bottom:12px;
 }
 
 .kpi{
-  font-size:32px;
-  font-weight:700;
-  margin-top:10px;
+  font-size:38px;
+  font-weight:800;
 }
 
 .small{
   color:var(--muted);
-  font-size:12px;
+  margin-top:8px;
+  font-size:13px;
 }
 
-.table-wrap{
-  overflow:auto;
+.red{
+  color:var(--red);
+}
+
+.green{
+  color:var(--green);
+}
+
+.blue{
+  color:var(--blue);
+}
+
+.yellow{
+  color:var(--yellow);
+}
+
+.section-title{
+  margin:30px 0 15px;
+  font-size:22px;
+  font-weight:700;
 }
 
 table{
@@ -96,9 +154,9 @@ table{
 }
 
 th,td{
-  padding:10px;
+  padding:12px;
   border-bottom:1px solid var(--border);
-  font-size:12px;
+  font-size:13px;
   text-align:left;
 }
 
@@ -106,230 +164,564 @@ th{
   color:var(--muted);
 }
 
-.delay-red{
-  color:var(--red);
+.badge{
+  padding:5px 10px;
+  border-radius:30px;
+  font-size:11px;
   font-weight:700;
+}
+
+.badge-red{
+  background:#450a0a;
+  color:#fca5a5;
+}
+
+.badge-green{
+  background:#052e16;
+  color:#86efac;
 }
 
 textarea{
   width:100%;
-  min-height:180px;
-  background:var(--bg3);
+  min-height:220px;
+  background:#111827;
   border:1px solid var(--border);
-  color:var(--text);
-  border-radius:8px;
-  padding:12px;
-  margin-top:10px;
+  color:white;
+  border-radius:12px;
+  padding:15px;
+  margin-top:15px;
 }
 
 button{
-  background:var(--accent);
-  color:#fff;
+  padding:12px 18px;
   border:none;
-  border-radius:8px;
-  padding:10px 14px;
-  margin-top:10px;
+  border-radius:10px;
+  background:var(--purple);
+  color:white;
+  font-weight:700;
   cursor:pointer;
+  margin-top:15px;
 }
 
 .chart-box{
-  height:320px;
+  height:340px;
 }
 
-.modal{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.6);
-  display:none;
-  align-items:center;
-  justify-content:center;
+.filters{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:20px;
 }
 
-.modal-content{
-  width:90%;
-  max-width:1000px;
-  background:var(--bg2);
+select,input{
+  background:#111827;
   border:1px solid var(--border);
-  border-radius:12px;
-  padding:20px;
+  color:white;
+  padding:10px 12px;
+  border-radius:10px;
 }
+
+.report-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:20px;
+}
+
+@media(max-width:900px){
+  .report-grid{
+    grid-template-columns:1fr;
+  }
+}
+
 </style>
 </head>
+
 <body>
 
 <div class="topbar">
-  <div class="logo">📰 NewsOps Dashboard</div>
-  <div class="live">LIVE</div>
+  <div class="logo">📰 NewsOps Enterprise Dashboard</div>
+  <div class="live">LIVE REPORTING</div>
 </div>
 
-<div class="main">
+<div class="container">
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="openTab('dashboard')">Dashboard</button>
+  <button class="tab-btn" onclick="openTab('daily')">Daily Report</button>
+  <button class="tab-btn" onclick="openTab('weekly')">Weekly Report</button>
+  <button class="tab-btn" onclick="openTab('monthly')">Monthly Report</button>
+  <button class="tab-btn" onclick="openTab('quarterly')">Quarterly Report</button>
+  <button class="tab-btn" onclick="openTab('rankings')">Rankings</button>
+  <button class="tab-btn" onclick="openTab('upload')">Upload Data</button>
+</div>
+
+<!-- DASHBOARD -->
+
+<div class="tab-content active" id="dashboard">
 
 <div class="grid">
-  <div class="card">
-    <h3>Total Pages</h3>
-    <div class="kpi">27,863</div>
-    <div class="small">Across all editions</div>
-  </div>
-
-  <div class="card">
-    <h3>Late Pages</h3>
-    <div class="kpi delay-red">15,702</div>
-    <div class="small">56.3% late rate</div>
-  </div>
-
-  <div class="card">
-    <h3>Average Delay</h3>
-    <div class="kpi">22.1m</div>
-    <div class="small">Overall release delay</div>
-  </div>
-
-  <div class="card">
-    <h3>On Time</h3>
-    <div class="kpi">12,161</div>
-    <div class="small">43.7% on time</div>
-  </div>
-</div>
-
-<br>
 
 <div class="card">
-  <h3>Monthly Delay Trend</h3>
+  <h3>Total Pages</h3>
+  <div class="kpi">27,863</div>
+  <div class="small">All states combined</div>
+</div>
+
+<div class="card">
+  <h3>Late Pages</h3>
+  <div class="kpi red">15,702</div>
+  <div class="small">56.3% late rate</div>
+</div>
+
+<div class="card">
+  <h3>Average Delay</h3>
+  <div class="kpi yellow">22.1m</div>
+  <div class="small">Average release delay</div>
+</div>
+
+<div class="card">
+  <h3>On-Time Pages</h3>
+  <div class="kpi green">12,161</div>
+  <div class="small">43.7% on time</div>
+</div>
+
+</div>
+
+<div class="section-title">Performance Trend</div>
+
+<div class="card">
   <div class="chart-box">
     <canvas id="trendChart"></canvas>
   </div>
 </div>
 
-<br>
+<div class="section-title">State Performance</div>
 
 <div class="grid">
 
 <div class="card">
-  <h3>🔥 Top Delayed Editions</h3>
-
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Edition</th>
-          <th>State</th>
-          <th>Avg Delay</th>
-        </tr>
-      </thead>
-
-      <tbody>
-        <tr>
-          <td>1</td>
-          <td>RP-KOT-JHALAWAR</td>
-          <td>Raj</td>
-          <td class="delay-red">116.6m</td>
-        </tr>
-
-        <tr>
-          <td>2</td>
-          <td>RP-SIK-SIKAR DAK</td>
-          <td>Raj</td>
-          <td class="delay-red">85m</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+  <h3>Rajasthan</h3>
+  <div class="kpi yellow">18.4m</div>
+  <div class="small">Avg delay</div>
 </div>
 
 <div class="card">
-  <h3>⚡ Branch Hotspots</h3>
-
-  <table>
-    <tr>
-      <td>Jaipur</td>
-      <td class="delay-red">+50.6m</td>
-    </tr>
-
-    <tr>
-      <td>Kota</td>
-      <td class="delay-red">+58.1m</td>
-    </tr>
-
-    <tr>
-      <td>Udaipur</td>
-      <td class="delay-red">+68.6m</td>
-    </tr>
-  </table>
+  <h3>Madhya Pradesh</h3>
+  <div class="kpi red">27.3m</div>
+  <div class="small">Avg delay</div>
 </div>
+
+<div class="card">
+  <h3>Chhattisgarh</h3>
+  <div class="kpi green">11.6m</div>
+  <div class="small">Avg delay</div>
+</div>
+
+<div class="card">
+  <h3>National</h3>
+  <div class="kpi blue">15.2m</div>
+  <div class="small">Avg delay</div>
+</div>
+
+</div>
+
+</div>
+
+<!-- DAILY REPORT -->
+
+<div class="tab-content" id="daily">
+
+<div class="filters">
+  <input type="date">
+  
+  <select>
+    <option>All States</option>
+    <option>Rajasthan</option>
+    <option>Madhya Pradesh</option>
+    <option>Chhattisgarh</option>
+    <option>National</option>
+  </select>
+</div>
+
+<div class="report-grid">
+
+<div class="card">
+
+<h3>🔥 Top 10 Delayed Editions</h3>
+
+<table>
+<thead>
+<tr>
+<th>Rank</th>
+<th>Edition</th>
+<th>State</th>
+<th>Delay</th>
+</tr>
+</thead>
+
+<tbody>
+
+<tr>
+<td>1</td>
+<td>RP-KOT-JHALAWAR</td>
+<td>Raj</td>
+<td><span class="badge badge-red">116m</span></td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>RP-SIK-SIKAR DAK</td>
+<td>Raj</td>
+<td><span class="badge badge-red">85m</span></td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>MP-BHO-CITY</td>
+<td>MP</td>
+<td><span class="badge badge-red">79m</span></td>
+</tr>
+
+</tbody>
+</table>
+
+</div>
+
+<div class="card">
+
+<h3>✅ Top 10 Best Editions</h3>
+
+<table>
+<thead>
+<tr>
+<th>Rank</th>
+<th>Edition</th>
+<th>State</th>
+<th>Status</th>
+</tr>
+</thead>
+
+<tbody>
+
+<tr>
+<td>1</td>
+<td>CG-RAI-CITY</td>
+<td>CG</td>
+<td><span class="badge badge-green">On Time</span></td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>RP-JAI-MAIN</td>
+<td>Raj</td>
+<td><span class="badge badge-green">Early</span></td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>NAT-DELHI</td>
+<td>National</td>
+<td><span class="badge badge-green">On Time</span></td>
+</tr>
+
+</tbody>
+</table>
+
+</div>
+
+</div>
+
+<div class="section-title">Daily Delay Analytics</div>
+
+<div class="card">
+<div class="chart-box">
+<canvas id="dailyChart"></canvas>
+</div>
+</div>
+
+</div>
+
+<!-- WEEKLY -->
+
+<div class="tab-content" id="weekly">
+
+<div class="grid">
+
+<div class="card">
+<h3>Worst Week</h3>
+<div class="kpi red">Week 2</div>
+<div class="small">29.2m avg delay</div>
+</div>
+
+<div class="card">
+<h3>Best Week</h3>
+<div class="kpi green">Week 4</div>
+<div class="small">8.4m avg delay</div>
+</div>
+
+<div class="card">
+<h3>Weekly Late %</h3>
+<div class="kpi yellow">58%</div>
+<div class="small">Overall</div>
+</div>
+
+</div>
+
+<div class="section-title">Weekly Trends</div>
+
+<div class="card">
+<div class="chart-box">
+<canvas id="weeklyChart"></canvas>
+</div>
+</div>
+
+</div>
+
+<!-- MONTHLY -->
+
+<div class="tab-content" id="monthly">
+
+<div class="grid">
+
+<div class="card">
+<h3>Monthly Avg Delay</h3>
+<div class="kpi yellow">21m</div>
+</div>
+
+<div class="card">
+<h3>Best State</h3>
+<div class="kpi green">CG</div>
+</div>
+
+<div class="card">
+<h3>Worst State</h3>
+<div class="kpi red">MP</div>
+</div>
+
+<div class="card">
+<h3>Improvement</h3>
+<div class="kpi blue">+18%</div>
+</div>
+
+</div>
+
+<div class="section-title">Monthly Analytics</div>
+
+<div class="card">
+<div class="chart-box">
+<canvas id="monthlyChart"></canvas>
+</div>
+</div>
+
+</div>
+
+<!-- QUARTERLY -->
+
+<div class="tab-content" id="quarterly">
+
+<div class="grid">
+
+<div class="card">
+<h3>Quarter Performance</h3>
+<div class="kpi green">Q2</div>
+</div>
+
+<div class="card">
+<h3>Delay Reduction</h3>
+<div class="kpi blue">14%</div>
+</div>
+
+<div class="card">
+<h3>Efficiency Score</h3>
+<div class="kpi yellow">78</div>
+</div>
+
+<div class="card">
+<h3>Consistency Score</h3>
+<div class="kpi green">84</div>
+</div>
+
+</div>
+
+<div class="section-title">Quarterly Trends</div>
+
+<div class="card">
+<div class="chart-box">
+<canvas id="quarterChart"></canvas>
+</div>
+</div>
+
+</div>
+
+<!-- RANKINGS -->
+
+<div class="tab-content" id="rankings">
+
+<div class="report-grid">
+
+<div class="card">
+
+<h3>🏆 Rajasthan Rankings</h3>
+
+<table>
+<tr>
+<th>Best Editions</th>
+<th>Delay Editions</th>
+</tr>
+
+<tr>
+<td>RP-JAI-MAIN</td>
+<td>RP-KOT-JHALAWAR</td>
+</tr>
+
+<tr>
+<td>RP-AJM-CITY</td>
+<td>RP-SIK-SIKAR</td>
+</tr>
+
+</table>
+
+</div>
+
+<div class="card">
+
+<h3>🏆 Madhya Pradesh Rankings</h3>
+
+<table>
+<tr>
+<th>Best Editions</th>
+<th>Delay Editions</th>
+</tr>
+
+<tr>
+<td>MP-INDORE</td>
+<td>MP-BHO-CITY</td>
+</tr>
+
+<tr>
+<td>MP-UJJAIN</td>
+<td>MP-SATNA</td>
+</tr>
+
+</table>
+
+</div>
+
+</div>
+
+</div>
+
+<!-- UPLOAD -->
+
+<div class="tab-content" id="upload">
+
+<div class="card">
+
+<h3>📥 Paste CSV / Timing Sheet</h3>
+
+<textarea placeholder="Date,State,Edition,Page,Scheduled,Released,Reason
+
+09.05.26,Rajasthan,RP-JAI-MAIN,Front Page,21:30,21:45,Ad Delay"></textarea>
+
+<button onclick="processData()">Process Data</button>
 
 </div>
 
 <br>
 
 <div class="card">
-  <h3>📋 Paste CSV / Timing Sheet</h3>
 
-  <textarea placeholder="09.05.26,Raj,Jaipur,RP-JAI-TONK,TONK PULLOUT,21:30,21:45,advt late"></textarea>
+<h3>📂 Upload Excel / CSV</h3>
 
-  <button onclick="processData()">Process & Update Dashboard</button>
-</div>
+<input type="file">
 
-<br>
+<button>Upload & Generate Reports</button>
 
-<div class="card">
-  <h3>📂 Upload Excel / CSV</h3>
-  <input type="file" />
 </div>
 
 </div>
 
-<div class="modal" id="lateModal">
-  <div class="modal-content">
-    <h2>Late Pages</h2>
-    <br>
-
-    <table>
-      <thead>
-        <tr>
-          <th>Edition</th>
-          <th>Scheduled</th>
-          <th>Released</th>
-          <th>Delay</th>
-        </tr>
-      </thead>
-
-      <tbody>
-        <tr>
-          <td>RP-BHO-BHOPAL CITY</td>
-          <td>00:30</td>
-          <td>01:29</td>
-          <td class="delay-red">59m</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <button onclick="closeModal()">Close</button>
-  </div>
 </div>
 
 <script>
-const ctx=document.getElementById('trendChart');
 
-new Chart(ctx,{
+function openTab(tabId){
+
+  let tabs=document.querySelectorAll('.tab-content');
+  tabs.forEach(tab=>tab.classList.remove('active'));
+
+  let btns=document.querySelectorAll('.tab-btn');
+  btns.forEach(btn=>btn.classList.remove('active'));
+
+  document.getElementById(tabId).classList.add('active');
+
+  event.target.classList.add('active');
+}
+
+function processData(){
+  alert('Data Processed Successfully');
+}
+
+new Chart(document.getElementById('trendChart'),{
   type:'line',
   data:{
     labels:['Jan','Feb','Mar','Apr','May'],
     datasets:[{
       label:'Late %',
-      data:[51,58,62,59,60],
+      data:[52,58,61,49,55],
       borderColor:'#7c3aed',
       tension:.3
     }]
   }
 });
 
-function processData(){
-  alert('Data processed successfully');
-}
+new Chart(document.getElementById('dailyChart'),{
+  type:'bar',
+  data:{
+    labels:['Raj','MP','CG','National'],
+    datasets:[{
+      label:'Average Delay',
+      data:[18,27,11,15]
+    }]
+  }
+});
 
-function closeModal(){
-  document.getElementById('lateModal').style.display='none';
-}
+new Chart(document.getElementById('weeklyChart'),{
+  type:'line',
+  data:{
+    labels:['Week1','Week2','Week3','Week4'],
+    datasets:[{
+      label:'Weekly Delay',
+      data:[22,29,18,8],
+      borderColor:'#dc2626',
+      tension:.4
+    }]
+  }
+});
+
+new Chart(document.getElementById('monthlyChart'),{
+  type:'bar',
+  data:{
+    labels:['Jan','Feb','Mar','Apr'],
+    datasets:[{
+      label:'Monthly Delay',
+      data:[31,24,18,15]
+    }]
+  }
+});
+
+new Chart(document.getElementById('quarterChart'),{
+  type:'radar',
+  data:{
+    labels:['Speed','Accuracy','Delay','Quality','Efficiency'],
+    datasets:[{
+      label:'Q2 Performance',
+      data:[82,74,68,91,78]
+    }]
+  }
+});
+
 </script>
 
 </body>
