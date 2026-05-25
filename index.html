@@ -3,641 +3,435 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>NewsOps Enterprise Dashboard</title>
+<title>NewsOps — Advanced Release Timing Dashboard</title>
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-
-:root{
-  --bg:#0d1117;
-  --card:#161b22;
-  --card2:#1f2937;
-  --border:#30363d;
-  --text:#e6edf3;
-  --muted:#8b949e;
-  --purple:#7c3aed;
-  --green:#16a34a;
-  --yellow:#d97706;
-  --red:#dc2626;
-  --blue:#2563eb;
-}
-
 *{
-  margin:0;
-  padding:0;
-  box-sizing:border-box;
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
 }
 
 body{
-  background:var(--bg);
-  color:var(--text);
-  font-family:Inter,sans-serif;
-}
-
-.topbar{
-  height:70px;
-  background:#111827;
-  border-bottom:1px solid var(--border);
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:0 25px;
-  position:sticky;
-  top:0;
-  z-index:999;
-}
-
-.logo{
-  font-size:22px;
-  font-weight:800;
-}
-
-.live{
-  background:var(--red);
-  padding:6px 14px;
-  border-radius:30px;
-  font-size:12px;
-  font-weight:700;
+    font-family:'Inter',sans-serif;
+    background:#f4f7fb;
+    color:#111827;
 }
 
 .container{
-  padding:20px;
+    max-width:1700px;
+    margin:auto;
+    padding:20px;
 }
 
-.tabs{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  margin-bottom:20px;
+.topbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+    flex-wrap:wrap;
+    gap:15px;
 }
 
-.tab-btn{
-  padding:10px 18px;
-  background:var(--card);
-  border:1px solid var(--border);
-  border-radius:10px;
-  cursor:pointer;
-  color:white;
-  font-weight:600;
+.title{
+    font-size:32px;
+    font-weight:800;
 }
 
-.tab-btn.active{
-  background:var(--purple);
+.subtitle{
+    color:#6b7280;
+    margin-top:4px;
 }
 
-.tab-content{
-  display:none;
-}
-
-.tab-content.active{
-  display:block;
-}
-
-.grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
-  gap:18px;
-}
-
-.card{
-  background:var(--card);
-  border:1px solid var(--border);
-  border-radius:16px;
-  padding:18px;
-}
-
-.card h3{
-  font-size:15px;
-  margin-bottom:12px;
-}
-
-.kpi{
-  font-size:38px;
-  font-weight:800;
-}
-
-.small{
-  color:var(--muted);
-  margin-top:8px;
-  font-size:13px;
-}
-
-.red{
-  color:var(--red);
-}
-
-.green{
-  color:var(--green);
-}
-
-.blue{
-  color:var(--blue);
-}
-
-.yellow{
-  color:var(--yellow);
-}
-
-.section-title{
-  margin:30px 0 15px;
-  font-size:22px;
-  font-weight:700;
-}
-
-table{
-  width:100%;
-  border-collapse:collapse;
-}
-
-th,td{
-  padding:12px;
-  border-bottom:1px solid var(--border);
-  font-size:13px;
-  text-align:left;
-}
-
-th{
-  color:var(--muted);
-}
-
-.badge{
-  padding:5px 10px;
-  border-radius:30px;
-  font-size:11px;
-  font-weight:700;
-}
-
-.badge-red{
-  background:#450a0a;
-  color:#fca5a5;
-}
-
-.badge-green{
-  background:#052e16;
-  color:#86efac;
-}
-
-textarea{
-  width:100%;
-  min-height:220px;
-  background:#111827;
-  border:1px solid var(--border);
-  color:white;
-  border-radius:12px;
-  padding:15px;
-  margin-top:15px;
+.actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
 }
 
 button{
-  padding:12px 18px;
-  border:none;
-  border-radius:10px;
-  background:var(--purple);
-  color:white;
-  font-weight:700;
-  cursor:pointer;
-  margin-top:15px;
+    border:none;
+    background:#2563eb;
+    color:white;
+    padding:12px 18px;
+    border-radius:12px;
+    font-weight:600;
+    cursor:pointer;
+    transition:0.2s;
 }
 
-.chart-box{
-  height:340px;
+button:hover{
+    transform:translateY(-2px);
+    opacity:0.92;
 }
 
-.filters{
-  display:flex;
-  gap:12px;
-  flex-wrap:wrap;
-  margin-bottom:20px;
+.secondary{
+    background:#111827;
 }
 
-select,input{
-  background:#111827;
-  border:1px solid var(--border);
-  color:white;
-  padding:10px 12px;
-  border-radius:10px;
+.danger{
+    background:#dc2626;
 }
 
-.report-grid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:20px;
+.grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px;
+    margin-bottom:20px;
 }
 
-@media(max-width:900px){
-  .report-grid{
-    grid-template-columns:1fr;
-  }
+.card{
+    background:white;
+    border-radius:18px;
+    padding:20px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.06);
 }
 
+.metric{
+    font-size:32px;
+    font-weight:800;
+    margin-top:8px;
+}
+
+.label{
+    color:#6b7280;
+    font-size:14px;
+}
+
+.green{color:#059669;}
+.red{color:#dc2626;}
+.orange{color:#ea580c;}
+.blue{color:#2563eb;}
+
+.section-title{
+    font-size:24px;
+    font-weight:800;
+    margin:30px 0 15px;
+}
+
+.chart-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+}
+
+@media(max-width:1100px){
+    .chart-grid{
+        grid-template-columns:1fr;
+    }
+}
+
+.table-wrap{
+    overflow:auto;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+th{
+    background:#111827;
+    color:white;
+    padding:14px;
+    text-align:left;
+    font-size:14px;
+}
+
+td{
+    padding:14px;
+    border-bottom:1px solid #e5e7eb;
+    font-size:14px;
+}
+
+tr:hover{
+    background:#f9fafb;
+}
+
+input,select{
+    width:100%;
+    padding:10px;
+    border:1px solid #d1d5db;
+    border-radius:10px;
+    font-size:14px;
+}
+
+.form-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:15px;
+    margin-top:15px;
+}
+
+.badge{
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:700;
+    display:inline-block;
+}
+
+.badge.good{
+    background:#dcfce7;
+    color:#166534;
+}
+
+.badge.delay{
+    background:#fee2e2;
+    color:#991b1b;
+}
+
+.badge.avg{
+    background:#ffedd5;
+    color:#9a3412;
+}
+
+.big-card{
+    background:white;
+    border-radius:18px;
+    padding:25px;
+    margin-bottom:20px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.06);
+}
+
+.flex{
+    display:flex;
+    gap:20px;
+    flex-wrap:wrap;
+}
+
+.half{
+    flex:1;
+    min-width:350px;
+}
+
+.small{
+    font-size:13px;
+    color:#6b7280;
+}
+
+textarea{
+    width:100%;
+    min-height:180px;
+    border-radius:12px;
+    border:1px solid #d1d5db;
+    padding:15px;
+    font-family:monospace;
+}
+
+.highlight{
+    background:#eff6ff;
+    border-left:5px solid #2563eb;
+    padding:15px;
+    border-radius:12px;
+    margin-top:15px;
+}
 </style>
 </head>
 
 <body>
 
-<div class="topbar">
-  <div class="logo">📰 NewsOps Enterprise Dashboard</div>
-  <div class="live">LIVE REPORTING</div>
-</div>
-
 <div class="container">
 
-<div class="tabs">
-  <button class="tab-btn active" onclick="openTab('dashboard')">Dashboard</button>
-  <button class="tab-btn" onclick="openTab('daily')">Daily Report</button>
-  <button class="tab-btn" onclick="openTab('weekly')">Weekly Report</button>
-  <button class="tab-btn" onclick="openTab('monthly')">Monthly Report</button>
-  <button class="tab-btn" onclick="openTab('quarterly')">Quarterly Report</button>
-  <button class="tab-btn" onclick="openTab('rankings')">Rankings</button>
-  <button class="tab-btn" onclick="openTab('upload')">Upload Data</button>
+<div class="topbar">
+<div>
+<div class="title">📰 NewsOps Release Timing Dashboard</div>
+<div class="subtitle">
+Daily • Weekly • Monthly • Quarterly • State Wise Performance Tracking
+</div>
 </div>
 
-<!-- DASHBOARD -->
+<div class="actions">
+<button onclick="downloadCSV()">Export CSV</button>
+<button class="secondary" onclick="loadSampleData()">Load Sample</button>
+<button class="danger" onclick="clearData()">Clear Data</button>
+</div>
+</div>
 
-<div class="tab-content active" id="dashboard">
-
+<!-- KPI -->
 <div class="grid">
 
 <div class="card">
-  <h3>Total Pages</h3>
-  <div class="kpi">27,863</div>
-  <div class="small">All states combined</div>
+<div class="label">Total Editions</div>
+<div class="metric blue" id="totalEditions">0</div>
 </div>
 
 <div class="card">
-  <h3>Late Pages</h3>
-  <div class="kpi red">15,702</div>
-  <div class="small">56.3% late rate</div>
+<div class="label">On Time Releases</div>
+<div class="metric green" id="onTime">0</div>
 </div>
 
 <div class="card">
-  <h3>Average Delay</h3>
-  <div class="kpi yellow">22.1m</div>
-  <div class="small">Average release delay</div>
+<div class="label">Delayed Editions</div>
+<div class="metric red" id="delayed">0</div>
 </div>
 
 <div class="card">
-  <h3>On-Time Pages</h3>
-  <div class="kpi green">12,161</div>
-  <div class="small">43.7% on time</div>
+<div class="label">Average Delay</div>
+<div class="metric orange" id="avgDelay">0 min</div>
 </div>
 
 </div>
 
-<div class="section-title">Performance Trend</div>
+<!-- ADD REPORT -->
+<div class="big-card">
+
+<h2>Add Daily Release Data</h2>
+
+<div class="form-grid">
+
+<div>
+<label>State</label>
+<select id="state">
+<option>Rajasthan</option>
+<option>Madhya Pradesh</option>
+<option>Chhattisgarh</option>
+<option>National</option>
+</select>
+</div>
+
+<div>
+<label>Edition</label>
+<input type="text" id="edition" placeholder="Jaipur">
+</div>
+
+<div>
+<label>Page</label>
+<input type="text" id="page" placeholder="Front Page">
+</div>
+
+<div>
+<label>Target Time</label>
+<input type="time" id="targetTime">
+</div>
+
+<div>
+<label>Release Time</label>
+<input type="time" id="releaseTime">
+</div>
+
+<div>
+<label>Date</label>
+<input type="date" id="date">
+</div>
+
+</div>
+
+<div style="margin-top:20px;">
+<button onclick="addRecord()">Add Record</button>
+</div>
+
+</div>
+
+<!-- REPORTS -->
+<div class="chart-grid">
 
 <div class="card">
-  <div class="chart-box">
-    <canvas id="trendChart"></canvas>
-  </div>
-</div>
-
-<div class="section-title">State Performance</div>
-
-<div class="grid">
-
-<div class="card">
-  <h3>Rajasthan</h3>
-  <div class="kpi yellow">18.4m</div>
-  <div class="small">Avg delay</div>
+<h3>Daily Report</h3>
+<canvas id="dailyChart"></canvas>
 </div>
 
 <div class="card">
-  <h3>Madhya Pradesh</h3>
-  <div class="kpi red">27.3m</div>
-  <div class="small">Avg delay</div>
+<h3>Weekly Report</h3>
+<canvas id="weeklyChart"></canvas>
 </div>
 
 <div class="card">
-  <h3>Chhattisgarh</h3>
-  <div class="kpi green">11.6m</div>
-  <div class="small">Avg delay</div>
+<h3>Monthly Report</h3>
+<canvas id="monthlyChart"></canvas>
 </div>
 
 <div class="card">
-  <h3>National</h3>
-  <div class="kpi blue">15.2m</div>
-  <div class="small">Avg delay</div>
+<h3>Quarterly Report</h3>
+<canvas id="quarterlyChart"></canvas>
 </div>
 
 </div>
 
-</div>
+<!-- TOP 10 -->
+<div class="section-title">Top 10 Best Editions State Wise</div>
 
-<!-- DAILY REPORT -->
-
-<div class="tab-content" id="daily">
-
-<div class="filters">
-  <input type="date">
-  
-  <select>
-    <option>All States</option>
-    <option>Rajasthan</option>
-    <option>Madhya Pradesh</option>
-    <option>Chhattisgarh</option>
-    <option>National</option>
-  </select>
-</div>
-
-<div class="report-grid">
-
-<div class="card">
-
-<h3>🔥 Top 10 Delayed Editions</h3>
-
-<table>
+<div class="table-wrap card">
+<table id="bestTable">
 <thead>
 <tr>
 <th>Rank</th>
-<th>Edition</th>
 <th>State</th>
-<th>Delay</th>
+<th>Edition</th>
+<th>Average Delay</th>
+<th>Status</th>
 </tr>
 </thead>
-
-<tbody>
-
-<tr>
-<td>1</td>
-<td>RP-KOT-JHALAWAR</td>
-<td>Raj</td>
-<td><span class="badge badge-red">116m</span></td>
-</tr>
-
-<tr>
-<td>2</td>
-<td>RP-SIK-SIKAR DAK</td>
-<td>Raj</td>
-<td><span class="badge badge-red">85m</span></td>
-</tr>
-
-<tr>
-<td>3</td>
-<td>MP-BHO-CITY</td>
-<td>MP</td>
-<td><span class="badge badge-red">79m</span></td>
-</tr>
-
-</tbody>
+<tbody></tbody>
 </table>
-
 </div>
 
-<div class="card">
+<div class="section-title">Top 10 Delayed Editions State Wise</div>
 
-<h3>✅ Top 10 Best Editions</h3>
-
-<table>
+<div class="table-wrap card">
+<table id="delayTable">
 <thead>
 <tr>
 <th>Rank</th>
-<th>Edition</th>
 <th>State</th>
+<th>Edition</th>
+<th>Average Delay</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+
+<!-- MASTER TABLE -->
+<div class="section-title">Complete Reporting Structure</div>
+
+<div class="table-wrap card">
+<table id="mainTable">
+
+<thead>
+<tr>
+<th>Date</th>
+<th>State</th>
+<th>Edition</th>
+<th>Page</th>
+<th>Target</th>
+<th>Released</th>
+<th>Delay</th>
 <th>Status</th>
 </tr>
 </thead>
 
-<tbody>
-
-<tr>
-<td>1</td>
-<td>CG-RAI-CITY</td>
-<td>CG</td>
-<td><span class="badge badge-green">On Time</span></td>
-</tr>
-
-<tr>
-<td>2</td>
-<td>RP-JAI-MAIN</td>
-<td>Raj</td>
-<td><span class="badge badge-green">Early</span></td>
-</tr>
-
-<tr>
-<td>3</td>
-<td>NAT-DELHI</td>
-<td>National</td>
-<td><span class="badge badge-green">On Time</span></td>
-</tr>
-
-</tbody>
-</table>
-
-</div>
-
-</div>
-
-<div class="section-title">Daily Delay Analytics</div>
-
-<div class="card">
-<div class="chart-box">
-<canvas id="dailyChart"></canvas>
-</div>
-</div>
-
-</div>
-
-<!-- WEEKLY -->
-
-<div class="tab-content" id="weekly">
-
-<div class="grid">
-
-<div class="card">
-<h3>Worst Week</h3>
-<div class="kpi red">Week 2</div>
-<div class="small">29.2m avg delay</div>
-</div>
-
-<div class="card">
-<h3>Best Week</h3>
-<div class="kpi green">Week 4</div>
-<div class="small">8.4m avg delay</div>
-</div>
-
-<div class="card">
-<h3>Weekly Late %</h3>
-<div class="kpi yellow">58%</div>
-<div class="small">Overall</div>
-</div>
-
-</div>
-
-<div class="section-title">Weekly Trends</div>
-
-<div class="card">
-<div class="chart-box">
-<canvas id="weeklyChart"></canvas>
-</div>
-</div>
-
-</div>
-
-<!-- MONTHLY -->
-
-<div class="tab-content" id="monthly">
-
-<div class="grid">
-
-<div class="card">
-<h3>Monthly Avg Delay</h3>
-<div class="kpi yellow">21m</div>
-</div>
-
-<div class="card">
-<h3>Best State</h3>
-<div class="kpi green">CG</div>
-</div>
-
-<div class="card">
-<h3>Worst State</h3>
-<div class="kpi red">MP</div>
-</div>
-
-<div class="card">
-<h3>Improvement</h3>
-<div class="kpi blue">+18%</div>
-</div>
-
-</div>
-
-<div class="section-title">Monthly Analytics</div>
-
-<div class="card">
-<div class="chart-box">
-<canvas id="monthlyChart"></canvas>
-</div>
-</div>
-
-</div>
-
-<!-- QUARTERLY -->
-
-<div class="tab-content" id="quarterly">
-
-<div class="grid">
-
-<div class="card">
-<h3>Quarter Performance</h3>
-<div class="kpi green">Q2</div>
-</div>
-
-<div class="card">
-<h3>Delay Reduction</h3>
-<div class="kpi blue">14%</div>
-</div>
-
-<div class="card">
-<h3>Efficiency Score</h3>
-<div class="kpi yellow">78</div>
-</div>
-
-<div class="card">
-<h3>Consistency Score</h3>
-<div class="kpi green">84</div>
-</div>
-
-</div>
-
-<div class="section-title">Quarterly Trends</div>
-
-<div class="card">
-<div class="chart-box">
-<canvas id="quarterChart"></canvas>
-</div>
-</div>
-
-</div>
-
-<!-- RANKINGS -->
-
-<div class="tab-content" id="rankings">
-
-<div class="report-grid">
-
-<div class="card">
-
-<h3>🏆 Rajasthan Rankings</h3>
-
-<table>
-<tr>
-<th>Best Editions</th>
-<th>Delay Editions</th>
-</tr>
-
-<tr>
-<td>RP-JAI-MAIN</td>
-<td>RP-KOT-JHALAWAR</td>
-</tr>
-
-<tr>
-<td>RP-AJM-CITY</td>
-<td>RP-SIK-SIKAR</td>
-</tr>
+<tbody></tbody>
 
 </table>
-
 </div>
+
+<!-- BULK PASTE -->
+<div class="section-title">Bulk Paste Data</div>
 
 <div class="card">
 
-<h3>🏆 Madhya Pradesh Rankings</h3>
+<p class="small">
+Format:<br>
+Date,State,Edition,Page,TargetTime,ReleaseTime
+</p>
 
-<table>
-<tr>
-<th>Best Editions</th>
-<th>Delay Editions</th>
-</tr>
+<textarea id="bulkData"></textarea>
 
-<tr>
-<td>MP-INDORE</td>
-<td>MP-BHO-CITY</td>
-</tr>
-
-<tr>
-<td>MP-UJJAIN</td>
-<td>MP-SATNA</td>
-</tr>
-
-</table>
-
+<div style="margin-top:15px;">
+<button onclick="importBulkData()">Import Data</button>
 </div>
 
-</div>
+<div class="highlight">
+Example:<br><br>
 
-</div>
-
-<!-- UPLOAD -->
-
-<div class="tab-content" id="upload">
-
-<div class="card">
-
-<h3>📥 Paste CSV / Timing Sheet</h3>
-
-<textarea placeholder="Date,State,Edition,Page,Scheduled,Released,Reason
-
-09.05.26,Rajasthan,RP-JAI-MAIN,Front Page,21:30,21:45,Ad Delay"></textarea>
-
-<button onclick="processData()">Process Data</button>
-
-</div>
-
-<br>
-
-<div class="card">
-
-<h3>📂 Upload Excel / CSV</h3>
-
-<input type="file">
-
-<button>Upload & Generate Reports</button>
-
+2026-05-25,Rajasthan,Jaipur,Front Page,22:00,22:12<br>
+2026-05-25,Madhya Pradesh,Bhopal,Sports,21:30,21:50
 </div>
 
 </div>
@@ -646,81 +440,345 @@ select,input{
 
 <script>
 
-function openTab(tabId){
+let records = [];
 
-  let tabs=document.querySelectorAll('.tab-content');
-  tabs.forEach(tab=>tab.classList.remove('active'));
+function getDelay(target, release){
 
-  let btns=document.querySelectorAll('.tab-btn');
-  btns.forEach(btn=>btn.classList.remove('active'));
+    const [th,tm] = target.split(':').map(Number);
+    const [rh,rm] = release.split(':').map(Number);
 
-  document.getElementById(tabId).classList.add('active');
+    const targetMin = th*60 + tm;
+    const releaseMin = rh*60 + rm;
 
-  event.target.classList.add('active');
+    return releaseMin - targetMin;
 }
 
-function processData(){
-  alert('Data Processed Successfully');
+function addRecord(){
+
+    const state = document.getElementById('state').value;
+    const edition = document.getElementById('edition').value;
+    const page = document.getElementById('page').value;
+    const target = document.getElementById('targetTime').value;
+    const release = document.getElementById('releaseTime').value;
+    const date = document.getElementById('date').value;
+
+    if(!edition || !page || !target || !release || !date){
+        alert("Please fill all fields");
+        return;
+    }
+
+    const delay = getDelay(target, release);
+
+    records.push({
+        state,
+        edition,
+        page,
+        target,
+        release,
+        delay,
+        date
+    });
+
+    updateDashboard();
 }
 
-new Chart(document.getElementById('trendChart'),{
-  type:'line',
-  data:{
-    labels:['Jan','Feb','Mar','Apr','May'],
-    datasets:[{
-      label:'Late %',
-      data:[52,58,61,49,55],
-      borderColor:'#7c3aed',
-      tension:.3
-    }]
-  }
-});
+function updateDashboard(){
 
-new Chart(document.getElementById('dailyChart'),{
-  type:'bar',
-  data:{
-    labels:['Raj','MP','CG','National'],
-    datasets:[{
-      label:'Average Delay',
-      data:[18,27,11,15]
-    }]
-  }
-});
+    const tbody = document.querySelector('#mainTable tbody');
+    tbody.innerHTML = '';
 
-new Chart(document.getElementById('weeklyChart'),{
-  type:'line',
-  data:{
-    labels:['Week1','Week2','Week3','Week4'],
-    datasets:[{
-      label:'Weekly Delay',
-      data:[22,29,18,8],
-      borderColor:'#dc2626',
-      tension:.4
-    }]
-  }
-});
+    let onTime = 0;
+    let delayed = 0;
+    let totalDelay = 0;
 
-new Chart(document.getElementById('monthlyChart'),{
-  type:'bar',
-  data:{
-    labels:['Jan','Feb','Mar','Apr'],
-    datasets:[{
-      label:'Monthly Delay',
-      data:[31,24,18,15]
-    }]
-  }
-});
+    records.forEach(r=>{
 
-new Chart(document.getElementById('quarterChart'),{
-  type:'radar',
-  data:{
-    labels:['Speed','Accuracy','Delay','Quality','Efficiency'],
-    datasets:[{
-      label:'Q2 Performance',
-      data:[82,74,68,91,78]
-    }]
-  }
-});
+        if(r.delay<=0){
+            onTime++;
+        }else{
+            delayed++;
+        }
+
+        totalDelay += r.delay;
+
+        tbody.innerHTML += `
+        <tr>
+            <td>${r.date}</td>
+            <td>${r.state}</td>
+            <td>${r.edition}</td>
+            <td>${r.page}</td>
+            <td>${r.target}</td>
+            <td>${r.release}</td>
+            <td>${r.delay} min</td>
+            <td>
+                ${
+                    r.delay<=0
+                    ? `<span class="badge good">On Time</span>`
+                    : r.delay<15
+                    ? `<span class="badge avg">Minor Delay</span>`
+                    : `<span class="badge delay">Delayed</span>`
+                }
+            </td>
+        </tr>
+        `;
+    });
+
+    document.getElementById('totalEditions').innerText = records.length;
+    document.getElementById('onTime').innerText = onTime;
+    document.getElementById('delayed').innerText = delayed;
+
+    const avg = records.length
+        ? Math.round(totalDelay/records.length)
+        : 0;
+
+    document.getElementById('avgDelay').innerText = avg + ' min';
+
+    updateCharts();
+    updateTopTables();
+}
+
+function updateCharts(){
+
+    const daily = {};
+    const weekly = {};
+    const monthly = {};
+    const quarterly = {};
+
+    records.forEach(r=>{
+
+        daily[r.date] = (daily[r.date] || 0) + r.delay;
+
+        const d = new Date(r.date);
+
+        const week = getWeekNumber(d);
+        const month = d.getMonth()+1;
+        const quarter = Math.floor(month/3)+1;
+
+        weekly["Week "+week] = (weekly["Week "+week] || 0) + r.delay;
+        monthly["Month "+month] = (monthly["Month "+month] || 0) + r.delay;
+        quarterly["Q"+quarter] = (quarterly["Q"+quarter] || 0) + r.delay;
+    });
+
+    renderChart('dailyChart', daily);
+    renderChart('weeklyChart', weekly);
+    renderChart('monthlyChart', monthly);
+    renderChart('quarterlyChart', quarterly);
+}
+
+function renderChart(id,data){
+
+    const ctx = document.getElementById(id);
+
+    if(ctx.chart){
+        ctx.chart.destroy();
+    }
+
+    ctx.chart = new Chart(ctx,{
+        type:'bar',
+        data:{
+            labels:Object.keys(data),
+            datasets:[{
+                label:'Total Delay (Minutes)',
+                data:Object.values(data)
+            }]
+        },
+        options:{
+            responsive:true,
+            plugins:{
+                legend:{
+                    display:false
+                }
+            }
+        }
+    });
+}
+
+function updateTopTables(){
+
+    const map = {};
+
+    records.forEach(r=>{
+
+        const key = r.state + "|" + r.edition;
+
+        if(!map[key]){
+            map[key] = {
+                state:r.state,
+                edition:r.edition,
+                total:0,
+                count:0
+            }
+        }
+
+        map[key].total += r.delay;
+        map[key].count++;
+    });
+
+    const arr = Object.values(map).map(i=>({
+        ...i,
+        avg:Math.round(i.total/i.count)
+    }));
+
+    const best = [...arr].sort((a,b)=>a.avg-b.avg).slice(0,10);
+    const worst = [...arr].sort((a,b)=>b.avg-a.avg).slice(0,10);
+
+    const bestBody = document.querySelector('#bestTable tbody');
+    const delayBody = document.querySelector('#delayTable tbody');
+
+    bestBody.innerHTML = '';
+    delayBody.innerHTML = '';
+
+    best.forEach((r,index)=>{
+        bestBody.innerHTML += `
+        <tr>
+            <td>#${index+1}</td>
+            <td>${r.state}</td>
+            <td>${r.edition}</td>
+            <td>${r.avg} min</td>
+            <td><span class="badge good">Excellent</span></td>
+        </tr>
+        `;
+    });
+
+    worst.forEach((r,index)=>{
+        delayBody.innerHTML += `
+        <tr>
+            <td>#${index+1}</td>
+            <td>${r.state}</td>
+            <td>${r.edition}</td>
+            <td>${r.avg} min</td>
+            <td><span class="badge delay">Delayed</span></td>
+        </tr>
+        `;
+    });
+}
+
+function getWeekNumber(d){
+
+    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
+
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+
+    const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+
+    return weekNo;
+}
+
+function importBulkData(){
+
+    const text = document.getElementById('bulkData').value.trim();
+
+    if(!text){
+        return;
+    }
+
+    const lines = text.split('\n');
+
+    lines.forEach(line=>{
+
+        const cols = line.split(',');
+
+        if(cols.length>=6){
+
+            const delay = getDelay(cols[4], cols[5]);
+
+            records.push({
+                date:cols[0],
+                state:cols[1],
+                edition:cols[2],
+                page:cols[3],
+                target:cols[4],
+                release:cols[5],
+                delay
+            });
+        }
+    });
+
+    updateDashboard();
+
+    alert("Bulk data imported successfully");
+}
+
+function downloadCSV(){
+
+    let csv = 'Date,State,Edition,Page,Target,Release,Delay\n';
+
+    records.forEach(r=>{
+        csv += `${r.date},${r.state},${r.edition},${r.page},${r.target},${r.release},${r.delay}\n`;
+    });
+
+    const blob = new Blob([csv], {type:'text/csv'});
+    const a = document.createElement('a');
+
+    a.href = URL.createObjectURL(blob);
+    a.download = 'newsops-report.csv';
+    a.click();
+}
+
+function clearData(){
+
+    if(confirm("Clear all records?")){
+        records = [];
+        updateDashboard();
+    }
+}
+
+function loadSampleData(){
+
+    records = [
+        {
+            date:'2026-05-25',
+            state:'Rajasthan',
+            edition:'Jaipur',
+            page:'Front Page',
+            target:'22:00',
+            release:'22:08',
+            delay:8
+        },
+        {
+            date:'2026-05-25',
+            state:'Rajasthan',
+            edition:'Udaipur',
+            page:'Sports',
+            target:'21:30',
+            release:'21:35',
+            delay:5
+        },
+        {
+            date:'2026-05-25',
+            state:'Madhya Pradesh',
+            edition:'Bhopal',
+            page:'City',
+            target:'22:00',
+            release:'22:24',
+            delay:24
+        },
+        {
+            date:'2026-05-25',
+            state:'Chhattisgarh',
+            edition:'Raipur',
+            page:'Business',
+            target:'21:45',
+            release:'22:00',
+            delay:15
+        },
+        {
+            date:'2026-05-25',
+            state:'National',
+            edition:'Delhi',
+            page:'National',
+            target:'23:00',
+            release:'23:02',
+            delay:2
+        }
+    ];
+
+    updateDashboard();
+}
+
+loadSampleData();
 
 </script>
 
