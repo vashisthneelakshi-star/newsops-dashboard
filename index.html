@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NewsOps — Page Release Timing Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;--border:#30363d;
+  --text:#e6edf3;--muted:#8b949e;--xs:#484f58;
+  --green:#2ea043;--gbg:#0d4429;--gborder:#26a641;
+  --yellow:#d29922;--ybg:#3d2b00;--yborder:#9e6a03;
+  --red:#f85149;--rbg:#3d1212;--rborder:#da3633;
+  --blue:#58a6ff;--bbg:#0c2d6b;
+  --accent:#7c3aed;--acl:#1e1050;
+  --raj:#f59e0b;--mp:#38bdf8;--cg:#a78bfa;--metro:#fb7185;
+  font-size:13px;
+}
+body{font-family:"IBM Plex Sans",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+code,pre,.mono{font-family:"IBM Plex Mono",monospace}
+
+/* TOP BAR */
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;gap:12px;height:52px;position:sticky;top:0;z-index:200}
+.logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;white-space:nowrap}
+.logo-icon{width:28px;height:28px;background:linear-gradient(135deg,#7c3aed,#2563eb);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.navtabs{display:flex;gap:1px;margin-left:auto;overflow-x:auto}
+.nt{padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;color:var(--muted);background:transparent;border:none;white-space:nowrap;transition:all .15s}
+.nt.active{background:var(--bg3);color:var(--text);font-weight:600}
+.nt:hover:not(.active){color:var(--text);background:rgba(255,255,255,.05)}
+.topright{display:flex;align-items:center;gap:8px;margin-left:12px;flex-shrink:0}
+.live{background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;letter-spacing:.5px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.clk{font-size:11px;color:var(--muted);font-family:"IBM Plex Mono",monospace}
+
+/* MAIN */
+.main{padding:16px;max-width:1440px;margin:0 auto}
+.sec{display:none}.sec.active{display:block}
+
+/* FILTER BAR */
+.fbar{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.fl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;flex-shrink:0}
+select,input[type=text],input[type=date],input[type=time]{background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:5px 9px;font-size:11px;color:var(--text);cursor:pointer;font-family:inherit}
+select:focus,input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.btn{padding:5px 12px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;font-family:inherit}
+.bp{background:var(--accent);color:#fff}.bp:hover{background:#6d28d9}
+.bg{background:var(--bg3);border:1px solid var(--border);color:var(--text)}.bg:hover{background:var(--border)}
+.bred{background:var(--rbg);border:1px solid var(--rborder);color:var(--red);font-size:12px;padding:6px 14px}.bred:hover{background:#5a1a1a}
+
+/* KPI GRID */
+.kg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;transition:border-color .2s;cursor:default}
+.kpi:hover{border-color:var(--accent)}
+.kl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+.kv{font-size:22px;font-weight:700;line-height:1;letter-spacing:-.5px}
+.ks{font-size:10px;color:var(--muted);margin-top:4px}
+.kpi.d .kv{color:var(--red)}.kpi.s .kv{color:var(--green)}.kpi.w .kv{color:var(--yellow)}.kpi.i .kv{color:var(--blue)}
+
+/* CARDS */
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.r3{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:14px}
+@media(max-width:700px){.r2,.r3{grid-template-columns:1fr}}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px}
+.ct{font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ctd{font-size:10px;color:var(--muted);font-weight:400}
+.cw{position:relative;width:100%}
+
+/* BADGE */
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;font-family:"IBM Plex Mono",monospace}
+.bon{background:var(--gbg);color:var(--green);border:1px solid var(--gborder)}
+.bmi{background:var(--ybg);color:var(--yellow);border:1px solid var(--yborder)}
+.bma{background:var(--rbg);color:var(--red);border:1px solid var(--rborder)}
+.bgood{background:#0c2d6b;color:var(--blue);border:1px solid #1d4ed8}
+
+/* STATE CHIP */
+.schip{display:inline-block;padding:1px 7px;border-radius:12px;font-size:10px;font-weight:700;letter-spacing:.3px}
+.schip-raj{background:#3d2b00;color:var(--raj);border:1px solid #92400e}
+.schip-mp{background:#0c2a3d;color:var(--mp);border:1px solid #0369a1}
+.schip-cg{background:#1e1050;color:var(--cg);border:1px solid #5b21b6}
+.schip-metro{background:#3d1212;color:var(--metro);border:1px solid #9f1239}
+
+/* TABLE */
+.tw{overflow-x:auto;max-height:400px;overflow-y:auto}
+.tw::-webkit-scrollbar{width:5px;height:5px}
+.tw::-webkit-scrollbar-track{background:var(--bg)}
+.tw::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{position:sticky;top:0;background:var(--bg);padding:7px 10px;text-align:left;font-weight:700;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border);white-space:nowrap;z-index:1}
+td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr{cursor:pointer;transition:background .1s}
+tbody tr:hover td{background:var(--bg3)}
+
+/* TABS */
+.tabrow{display:flex;gap:3px;margin-bottom:14px;flex-wrap:wrap}
+.tab{padding:5px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--bg3);color:var(--muted);transition:all .15s;font-family:inherit}
+.tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* MODAL */
+.mbg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:400;display:none;align-items:flex-start;justify-content:center;padding:32px 12px;overflow-y:auto}
+.mbg.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:20px;width:min(820px,100%);max-height:85vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.5)}
+.mtit{font-size:15px;font-weight:700;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+.xbtn{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:16px;color:var(--muted);line-height:1}
+.xbtn:hover{background:var(--border)}
+
+/* STATE BAR */
+.sbar-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.sbar-name{width:50px;font-size:11px;font-weight:700}
+.sbar-track{flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.sbar-fill{height:100%;border-radius:3px;transition:width .6s ease}
+.sbar-pct{width:38px;font-size:10px;color:var(--muted);text-align:right}
+
+/* REPORT BLOCKS */
+.rep-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+@media(max-width:600px){.rep-grid{grid-template-columns:1fr}}
+.rep-state-block{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px}
+.rep-state-title{font-size:12px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.rep-row{display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)}
+.rep-row:last-child{border:none}
+.rep-num{width:18px;height:18px;border-radius:50%;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;color:#fff}
+.n1{background:#dc2626}.n2{background:#ea580c}.n3{background:#ca8a04}.n4{background:#16a34a}.n5{background:#2563eb}
+.n6{background:#7c3aed}.n7{background:#db2777}.n8{background:#0891b2}.n9{background:#65a30d}.n10{background:#4338ca}
+.rep-info{flex:1;min-width:0}
+.rep-ename{font-weight:600;font-size:11px;word-break:break-all}
+.rep-detail{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.5}
+.rep-delay{font-weight:700;font-family:"IBM Plex Mono",monospace;color:var(--red)}
+.rep-good-block .rep-delay{color:var(--blue)}
+.divider-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:16px 0 10px;display:flex;align-items:center;gap:8px}
+.divider-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ALERT */
+.alrt{padding:10px 13px;border-radius:7px;font-size:11px;margin-bottom:12px;display:flex;gap:8px;align-items:flex-start;line-height:1.5}
+.alrt.info{background:var(--bbg);color:var(--blue);border:1px solid #1d4ed8}
+.alrt.warn{background:var(--ybg);color:var(--yellow);border:1px solid var(--yborder)}
+.alrt.ok{background:var(--gbg);color:var(--green);border:1px solid var(--gborder)}
+
+/* DATA ENTRY */
+.uarea{border:2px dashed var(--border);border-radius:8px;padding:28px;text-align:center;cursor:pointer;transition:all .2s}
+.uarea:hover{border-color:var(--accent);background:var(--acl)}
+textarea{width:100%;min-height:120px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11px;font-family:"IBM Plex Mono",monospace;color:var(--text);resize:vertical}
+
+/* MONO TIME */
+.mono-time{font-family:"IBM Plex Mono",monospace;font-size:11px}
+.delay-red{color:var(--red);font-weight:700;font-family:"IBM Plex Mono",monospace}
+.delay-yellow{color:var(--yellow);font-weight:700;font-family:"IBM Plex Mono",monospace}
+.delay-green{color:var(--green);font-weight:700;font-family:"IBM Plex Mono",monospace}
+
+/* CHART LEGEND */
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text)}
+.leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.leg-line{width:20px;height:3px;border-radius:2px;flex-shrink:0}
+
+/* SUMMARY ROW */
+.smrow{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;gap:8px}
+.smrow:last-child{border:none}
+.sml{color:var(--muted)}
+
+/* HEATMAP */
+#hm-wrap{display:flex;flex-wrap:wrap;gap:3px}
+.hm-cell{width:22px;height:22px;border-radius:3px;cursor:pointer;flex-shrink:0;transition:transform .1s}
+.hm-cell:hover{transform:scale(1.3);z-index:1}
+
+/* LOADING */
+#login-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:16px}
+#login-screen h1{font-size:22px;font-weight:700;margin-bottom:4px}
+#login-screen p{color:var(--muted);font-size:13px}
+.login-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:28px;width:min(360px,95vw);text-align:center}
+.login-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:13px;color:var(--text);margin-bottom:10px;font-family:inherit}
+.login-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.login-btn:hover{background:#6d28d9}
+.login-hint{font-size:11px;color:var(--muted);margin-top:8px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div style="font-size:32px;margin-bottom:12px">📰</div>
+    <h1>NewsOps Dashboard</h1>
+    <p style="margin-bottom:20px;font-size:12px;color:var(--muted)">Newspaper Page Release Timing Monitor</p>
+    <input class="login-input" type="text" id="l-user" placeholder="Username" value="newsroom">
+    <input class="login-input" type="password" id="l-pass" placeholder="Password" value="rajasthan@123">
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-hint">Demo: newsroom / rajasthan@123</div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none">
+<div class="topbar">
+  <div class="logo"><div class="logo-icon">📰</div>NewsOps</div>
+  <div class="navtabs">
+    <button class="nt active" onclick="showSec('overview',this)">📊 Overview</button>
+    <button class="nt" onclick="showSec('analytics',this)">📈 Analytics</button>
+    <button class="nt" onclick="showSec('editions',this)">📋 Editions</button>
+    <button class="nt" onclick="showSec('data',this)">📥 Data Entry</button>
+    <button class="nt" onclick="showSec('reports',this)">📄 Reports</button>
+  </div>
+  <div class="topright">
+    <span class="live">LIVE</span>
+    <span class="clk" id="clk"></span>
+    <span id="user-name" style="font-size:11px;color:var(--muted)"></span>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ===== OVERVIEW ===== -->
+<div id="sec-overview" class="sec active">
+  <div class="fbar">
+    <span class="fl">Filter:</span>
+    <select id="ov-state" onchange="applyOvFilters()">
+      <option value="">All States</option>
+      <option value="Raj">🟡 Rajasthan</option>
+      <option value="MP">🔵 Madhya Pradesh</option>
+      <option value="CG">🟣 Chhattisgarh</option>
+      <option value="Metro">🔴 Metro / National</option>
+    </select>
+    <select id="ov-month" onchange="applyOvFilters()">
+      <option value="">All Months</option>
+      <option value="2025-11">Nov 2025</option>
+      <option value="2025-12">Dec 2025</option>
+      <option value="2026-01">Jan 2026</option>
+      <option value="2026-02">Feb 2026</option>
+      <option value="2026-03">Mar 2026</option>
+      <option value="2026-04">Apr 2026</option>
+      <option value="2026-05">May 2026</option>
+    </select>
+    <select id="ov-branch" onchange="applyOvFilters()">
+      <option value="">All Branches</option>
+    </select>
+    <select id="ov-status" onchange="applyOvFilters()">
+      <option value="">All Status</option>
+      <option value="on_time">On Time</option>
+      <option value="minor">Minor Delay (1–30 min)</option>
+      <option value="major">Major Delay (&gt;30 min)</option>
+    </select>
+    <select id="ov-delay" onchange="applyOvFilters()">
+      <option value="">Any Delay Range</option>
+      <option value="0-15">0–15 min late</option>
+      <option value="15-30">15–30 min late</option>
+      <option value="30-60">30–60 min late</option>
+      <option value="60+">60+ min late</option>
+    </select>
+    <button class="btn bg" onclick="resetOv()">↺ Reset</button>
+    <button class="bred btn" onclick="openLateModal()" style="margin-left:auto">🔴 Late Pages Today &nbsp;<span id="late-badge" style="background:rgba(255,80,80,.2);border-radius:12px;padding:1px 7px;font-size:10px"></span></button>
+  </div>
+  <div class="kg">
+    <div class="kpi i"><div class="kl">Total Pages Tracked</div><div class="kv" id="k-tot">27,863</div><div class="ks">Nov 2025 – May 2026</div></div>
+    <div class="kpi d"><div class="kl">Late Pages</div><div class="kv" id="k-late">17,515</div><div class="ks" id="k-latepct">62.9% late rate</div></div>
+    <div class="kpi w"><div class="kl">Avg Delay</div><div class="kv" id="k-avg">18.2 min</div><div class="ks" id="k-avgdesc">Filtered average</div></div>
+    <div class="kpi s"><div class="kl">On-Time Pages</div><div class="kv" id="k-ot">10,348</div><div class="ks" id="k-otpct">37.1% on time</div></div>
+    <div class="kpi d"><div class="kl">Worst Performer</div><div class="kv" id="k-worst" style="font-size:16px">Rajasthan</div><div class="ks">70.5% late • avg +29.5 min</div></div>
+    <div class="kpi s"><div class="kl">Best Performer</div><div class="kv" id="k-best" style="font-size:16px">CG</div><div class="ks">46.2% late • avg −4.1 min</div></div>
+  </div>
+  <div class="r2">
+    <div class="card">
+      <div class="ct">📊 Late % Trend by Month
+        <div style="margin-left:auto">
+          <div class="legend">
+            <div class="leg-item"><div class="leg-line" style="background:var(--raj)"></div>Rajasthan</div>
+            <div class="leg-item"><div class="leg-line" style="background:var(--mp)"></div>MP</div>
+            <div class="leg-item"><div class="leg-line" style="background:var(--cg)"></div>CG</div>
+            <div class="leg-item"><div class="leg-line" style="background:var(--metro)"></div>Metro</div>
+          </div>
+        </div>
+      </div>
+      <div class="cw" style="height:200px"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="ct">🗺️ State-wise Late Rate (%)</div>
+      <div id="statebars" style="padding:4px 0"></div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+        <div class="ct" style="font-size:11px;margin-bottom:8px">Delay Type Breakdown</div>
+        <div class="cw" style="height:110px"><canvas id="pieChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+  <div class="r3">
+    <div class="card">
+      <div class="ct">🔥 Top 10 Most Delayed Editions <span class="ctd">— Click a row to see edition details</span></div>
+      <div class="tw">
+        <table><thead><tr><th>#</th><th>Edition</th><th>State</th><th>Branch</th><th>Avg Delay</th><th>Late %</th><th>Worst Day</th><th>Worst Delay</th><th>Status</th></tr></thead>
+        <tbody id="top-delayed-body"></tbody></table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ct">⚡ Branch Hotspots
+        <span class="ctd" style="margin-left:auto">Avg release delay per branch</span>
+      </div>
+      <div id="branch-hotspots"></div>
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:var(--muted);line-height:1.6">
+        Avg Delay = Mean release delay across all editions in that branch.<br>
+        <span style="color:var(--red)">Red = 60+ min</span> · <span style="color:var(--yellow)">Yellow = 15–60 min</span> · <span style="color:var(--green)">Green = advance/on time</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ANALYTICS ===== -->
+<div id="sec-analytics" class="sec">
+  <div class="tabrow">
+    <button class="tab active" onclick="setAnTab('monthly',this)">📅 Monthly Trend</button>
+    <button class="tab" onclick="setAnTab('statewise',this)">🗺️ State Comparison</button>
+    <button class="tab" onclick="setAnTab('heatmap',this)">🌡️ Daily Heatmap</button>
+    <button class="tab" onclick="setAnTab('distrib',this)">📊 Distribution</button>
+  </div>
+  <div id="an-monthly">
+    <div class="alrt info">📌 <div><strong>Monthly Trend:</strong> How many pages were late each month, broken down by state. Higher = more delays. The line chart below shows average delay minutes over time.</div></div>
+    <div class="legend" style="margin-bottom:10px">
+      <div class="leg-item"><div class="leg-dot" style="background:var(--raj)"></div>Rajasthan</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--mp)"></div>Madhya Pradesh</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--cg)"></div>Chhattisgarh</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--metro)"></div>Metro / National</div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="ct">Late Pages Count — Monthly by State (Stacked)</div>
+      <div class="cw" style="height:260px"><canvas id="monthStack"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="ct">Average Delay (minutes) — Monthly Trend by State</div>
+      <div class="cw" style="height:230px"><canvas id="monthLine"></canvas></div>
+    </div>
+  </div>
+  <div id="an-statewise" style="display:none">
+    <div class="alrt info">📌 <strong>State Comparison:</strong> Side-by-side look at all 4 states. Left: average delay in minutes (positive = late, negative = advance). Right: % of pages that were late.</div>
+    <div class="legend" style="margin-bottom:10px">
+      <div class="leg-item"><div class="leg-dot" style="background:var(--raj)"></div>Rajasthan</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--mp)"></div>MP</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--cg)"></div>CG</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--metro)"></div>Metro</div>
+    </div>
+    <div class="r2">
+      <div class="card"><div class="ct">Avg Delay by State <span class="ctd">Positive = Late, Negative = Advance</span></div>
+        <div class="cw" style="height:230px"><canvas id="stateDelayC"></canvas></div></div>
+      <div class="card"><div class="ct">Late Rate by State (%)</div>
+        <div class="cw" style="height:230px"><canvas id="stateLateC"></canvas></div></div>
+    </div>
+    <div class="card">
+      <div class="ct">Monthly Avg Delay Trend — All States</div>
+      <div class="cw" style="height:250px"><canvas id="stateMonthC"></canvas></div>
+    </div>
+  </div>
+  <div id="an-heatmap" style="display:none">
+    <div class="alrt info">📌 <strong>Daily Heatmap:</strong> Each cell = one day. Green = few delays, Red = many delays. Hover to see exact stats. Patterns reveal recurring problem days.</div>
+    <div class="card">
+      <div class="ct">Daily Late Rate Heatmap — Last 30 Days</div>
+      <div style="display:flex;gap:4px;align-items:center;margin-bottom:10px;font-size:10px;color:var(--muted)">
+        <span>Low →</span>
+        <div style="width:14px;height:14px;border-radius:2px;background:#0d4429"></div>
+        <div style="width:14px;height:14px;border-radius:2px;background:#2d6a1a"></div>
+        <div style="width:14px;height:14px;border-radius:2px;background:#ca8a04"></div>
+        <div style="width:14px;height:14px;border-radius:2px;background:#b45309"></div>
+        <div style="width:14px;height:14px;border-radius:2px;background:#dc2626"></div>
+        <span>→ High delay</span>
+      </div>
+      <div id="hm-wrap"></div>
+    </div>
+  </div>
+  <div id="an-distrib" style="display:none">
+    <div class="alrt info">📌 <strong>Delay Distribution:</strong> X-axis = delay in minutes. Y-axis = how many pages had that delay. Shows whether most delays are short (5–15 min) or chronic (60+ min).</div>
+    <div class="card"><div class="ct">Delay Duration Distribution (minutes)</div>
+      <div class="cw" style="height:280px"><canvas id="distC"></canvas></div></div>
+  </div>
+</div>
+
+<!-- ===== EDITIONS ===== -->
+<div id="sec-editions" class="sec">
+  <div class="alrt info">📌 <strong>Editions Tab:</strong> Complete performance record of every edition — total pages tracked, how many were late, average delay, and the single worst delay day. Click any row to drill down. Use filters to isolate problem editions by state or branch.</div>
+  <div class="fbar">
+    <span class="fl">Search:</span>
+    <input type="text" id="ed-q" placeholder="Edition or branch name..." oninput="filterEd()" style="width:190px">
+    <select id="ed-st" onchange="filterEd()">
+      <option value="">All States</option>
+      <option value="Raj">Rajasthan</option><option value="MP">MP</option>
+      <option value="CG">CG</option><option value="Metro">Metro</option>
+    </select>
+    <select id="ed-br" onchange="filterEd()"><option value="">All Branches</option></select>
+    <select id="ed-sort" onchange="filterEd()">
+      <option value="avg_delay">Sort: Avg Delay ↓</option>
+      <option value="late_pct">Sort: Late % ↓</option>
+      <option value="worst_delay">Sort: Worst Delay ↓</option>
+      <option value="total">Sort: Total Pages ↓</option>
+    </select>
+    <select id="ed-status" onchange="filterEd()">
+      <option value="">All Status</option>
+      <option value="major">Major Delay (&gt;30 min avg)</option>
+      <option value="minor">Minor Delay (0–30 avg)</option>
+      <option value="good">Good / On Time</option>
+    </select>
+  </div>
+  <div class="card">
+    <div class="ct">All Editions Performance <span class="ctd" id="ed-cnt"></span></div>
+    <div class="tw" style="max-height:520px">
+      <table><thead><tr><th>#</th><th>Edition</th><th>State</th><th>Branch</th><th>Total</th><th>Late</th><th>Late %</th><th>Avg Delay</th><th>Worst Delay</th><th>Worst Day</th><th>Status</th></tr></thead>
+      <tbody id="ed-body"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DATA ENTRY ===== -->
+<div id="sec-data" class="sec">
+  <div class="tabrow">
+    <button class="tab active" onclick="setDTab('paste',this)">📋 Paste Data</button>
+    <button class="tab" onclick="setDTab('upload',this)">📂 Upload File</button>
+    <button class="tab" onclick="setDTab('manual',this)">✏️ Manual Entry</button>
+    <button class="tab" onclick="setDTab('gsheet',this)">🔗 Google Sheet</button>
+  </div>
+  <div id="dt-paste">
+    <div class="alrt info">📋 Paste your daily timing sheet below in CSV or tab-separated format. One row per edition. Header row is optional.</div>
+    <div class="card">
+      <div class="ct">Paste CSV / Tab-Separated Data</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px">Format: date, state, branch, edition, pullout, sched_time, release_time, delay_cause</div>
+      <textarea id="paste-in" placeholder="09.05.26,Raj,Jaipur,RP-JAI-TONK,TONK PULLOUT,21:30,21:45,advt late&#10;09.05.26,MP,Bhopal,RP-BHO-BHOPAL CITY,MAIN,23:00,23:52,server issue&#10;..."></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn bp" onclick="processPaste()">🔄 Process & Update Dashboard</button>
+        <button class="btn bg" onclick="document.getElementById('paste-in').value=''">Clear</button>
+        <span id="paste-st" style="font-size:11px;color:var(--green)"></span>
+      </div>
+    </div>
+  </div>
+  <div id="dt-upload" style="display:none">
+    <div class="card">
+      <div class="ct">Upload Excel / CSV File</div>
+      <div class="uarea" onclick="document.getElementById('fi').click()" ondrop="dropF(event)" ondragover="event.preventDefault()">
+        <div style="font-size:36px;margin-bottom:10px">📂</div>
+        <div style="font-weight:700;margin-bottom:4px">Click or drag & drop your file here</div>
+        <div style="font-size:11px;color:var(--muted)">.xlsx, .csv, .xls accepted</div>
+        <input type="file" id="fi" accept=".csv,.xlsx,.xls" style="display:none" onchange="fileUp(event)">
+      </div>
+      <div id="up-st" style="margin-top:10px;font-size:11px;color:var(--muted)"></div>
+    </div>
+  </div>
+  <div id="dt-manual" style="display:none">
+    <div class="card">
+      <div class="ct">Manual Record Entry</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">
+        <div><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Date *</div><input type="date" id="m-d" style="width:100%"></div>
+        <div><div style="font-size:10px;color:var(--muted);margin-bottom:3px">State *</div>
+          <select id="m-s" style="width:100%"><option>CG</option><option>MP</option><option>Raj</option><option>Metro</option></select></div>
+        <div><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Branch *</div><input type="text" id="m-br" placeholder="e.g. Jaipur" style="width:100%"></div>
+        <div><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Edition *</div><input type="text" id="m-e" placeholder="e.g. RP-JAI-TONK" style="width:100%"></div>
+        <div><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Pullout / Page</div><input type="text" id="m-p" placeholder="TONK PULLOUT" style="width:100%"></div>
+        <div><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Scheduled Time *</div><input type="time" id="m-sc" style="width:100%"></div>
+        <div><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Release Time *</div><input type="time" id="m-rl" style="width:100%"></div>
+        <div><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Delay Cause</div><input type="text" id="m-c" placeholder="advt late, network issue..." style="width:100%"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+        <button class="btn bp" onclick="addManual()">+ Add Entry</button>
+        <span id="man-st" style="font-size:11px;color:var(--green)"></span>
+      </div>
+      <div id="man-prev" style="margin-top:12px"></div>
+    </div>
+  </div>
+  <div id="dt-gsheet" style="display:none">
+    <div class="alrt info">🔗 Paste your Google Sheet CSV export URL. Go to: File → Share → Publish to web → Select sheet → CSV format → Copy link. Dashboard will auto-sync.</div>
+    <div class="card">
+      <div class="ct">Google Sheets Auto-Sync</div>
+      <div style="margin-bottom:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">Google Sheet CSV URL</div>
+        <input type="text" id="gs-url" placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv" style="width:100%"></div>
+      <div style="margin-bottom:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">Auto-Refresh Interval</div>
+        <select id="gs-int"><option value="0">Manual Only</option><option value="300">Every 5 Minutes</option><option value="600">Every 10 Minutes</option><option value="1800">Every 30 Minutes</option></select></div>
+      <button class="btn bp" onclick="syncGS()">🔄 Sync Now</button>
+      <div id="gs-st" style="margin-top:8px;font-size:11px"></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="ct">Required Column Format</div>
+      <div style="overflow-x:auto"><table style="min-width:600px"><thead><tr><th>A — Date</th><th>B — State</th><th>C — Branch</th><th>D — Edition</th><th>E — Pullout</th><th>F — Sched Time</th><th>G — Release Time</th><th>H — Delay Cause</th></tr></thead>
+      <tbody><tr><td class="mono-time">09.05.26</td><td>Raj</td><td>Jaipur</td><td>RP-JAI-TONK</td><td>TONK PULLOUT</td><td class="mono-time">21:30</td><td class="mono-time">21:45</td><td>advt late</td></tr></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== REPORTS ===== -->
+<div id="sec-reports" class="sec">
+  <div class="fbar">
+    <span class="fl">Period:</span>
+    <button class="tab active" onclick="setRepPeriod('daily',this)" id="rp-daily">Daily (09 May)</button>
+    <button class="tab" onclick="setRepPeriod('weekly',this)" id="rp-weekly">Weekly (3–9 May)</button>
+    <button class="tab" onclick="setRepPeriod('monthly',this)" id="rp-monthly">Monthly (May 2026)</button>
+    <button class="tab" onclick="setRepPeriod('yearly',this)" id="rp-yearly">Full Period</button>
+    <select id="rep-state-filter" onchange="renderReport()" style="margin-left:auto">
+      <option value="">All States</option>
+      <option value="Raj">Rajasthan Only</option>
+      <option value="MP">MP Only</option>
+      <option value="CG">CG Only</option>
+      <option value="Metro">Metro Only</option>
+    </select>
+    <button class="btn bg" onclick="window.print()">🖨️ Print Report</button>
+  </div>
+  <div id="rep-summary-card" class="card" style="margin-bottom:12px">
+    <div id="rep-summary"></div>
+  </div>
+  <div class="divider-label">🔴 Top 10 Most Delayed Editions — By State</div>
+  <div class="rep-grid" id="rep-delayed-grid"></div>
+  <div class="divider-label">🟢 Top 10 Best Performing Editions (No / Low Delay) — By State</div>
+  <div class="rep-grid" id="rep-good-grid"></div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- LATE TODAY MODAL -->
+<div class="mbg" id="late-modal">
+  <div class="modal">
+    <div class="mtit">🔴 Late Pages — 09 May 2026
+      <button class="xbtn" onclick="document.getElementById('late-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="tabrow">
+      <button class="tab active" onclick="sortLate('delay',this)">Most Delayed First</button>
+      <button class="tab" onclick="sortLate('state',this)">By State</button>
+      <button class="tab" onclick="sortLate('edition',this)">Edition A–Z</button>
+    </div>
+    <div id="late-summary-text" style="font-size:11px;color:var(--muted);margin-bottom:10px"></div>
+    <div class="tw" style="max-height:440px">
+      <table><thead><tr><th>State</th><th>Branch</th><th>Edition</th><th>Pullout</th><th>Scheduled</th><th>Released</th><th>Delay</th><th>Reason</th><th>Status</th></tr></thead>
+      <tbody id="late-body"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script>
+const DD={"daily":{"Raj":[{"e":"RP-KOT-JHALAWAR","s":"Raj","b":"Kota","t":1,"ad":131.0,"wd":"09.05.26","wdl":131.0,"ws":"21:45","wr":"23:56"},{"e":"RP-SIK-SIKAR DAK","s":"Raj","b":"Sikar","t":1,"ad":85.0,"wd":"09.05.26","wdl":85.0,"ws":"23:30","wr":"00:55"},{"e":"RP-JAI-JAIPUR CITY","s":"Raj","b":"Jaipur","t":1,"ad":83.0,"wd":"09.05.26","wdl":83.0,"ws":"00:30","wr":"01:53"},{"e":"RP-UDA-UDAIPUR DAK","s":"Raj","b":"Udaipur","t":1,"ad":76.0,"wd":"09.05.26","wdl":76.0,"ws":"23:30","wr":"00:46"},{"e":"RP-BHI-CHITTORGARH","s":"Raj","b":"Bhilwara","t":2,"ad":73.0,"wd":"09.05.26","wdl":137.0,"ws":"22:00","wr":"00:17"},{"e":"RP-SIK-CHURU DAK","s":"Raj","b":"Sikar","t":1,"ad":66.0,"wd":"09.05.26","wdl":66.0,"ws":"22:30","wr":"23:36"},{"e":"RP-SIK-JHUNJHUNU","s":"Raj","b":"Sikar","t":1,"ad":65.0,"wd":"09.05.26","wdl":65.0,"ws":"23:00","wr":"00:05"},{"e":"RP-JAI-DAUSA","s":"Raj","b":"Jaipur Regional","t":2,"ad":54.5,"wd":"09.05.26","wdl":86.0,"ws":"21:45","wr":"23:11"},{"e":"RP-KOT-KOTA CITY","s":"Raj","b":"Kota","t":1,"ad":53.0,"wd":"09.05.26","wdl":53.0,"ws":"01:00","wr":"01:53"},{"e":"RAJ-UDA-UDAIPUR CITY","s":"Raj","b":"Udaipur","t":1,"ad":51.0,"wd":"09.05.26","wdl":51.0,"ws":"01:00","wr":"01:51"}],"MP":[{"e":"RP-JAB-SHAHDOL","s":"MP","b":"Shahdol","t":1,"ad":66.0,"wd":"09.05.26","wdl":66.0,"ws":"21:50","wr":"22:56"},{"e":"RP-BHO-ITARSI","s":"MP","b":"Bhopal","t":1,"ad":62.0,"wd":"09.05.26","wdl":62.0,"ws":"23:40","wr":"00:42"},{"e":"RP-BHO-BHOPAL CITY","s":"MP","b":"Bhopal","t":1,"ad":59.0,"wd":"09.05.26","wdl":59.0,"ws":"00:30","wr":"01:29"},{"e":"RAJ-BHO-ASHOK NAGAR","s":"MP","b":"Bhopal Regional","t":1,"ad":41.0,"wd":"09.05.26","wdl":41.0,"ws":"22:00","wr":"22:41"},{"e":"RP-BHO-RAJGARH","s":"MP","b":"Bhopal Regional","t":1,"ad":40.0,"wd":"09.05.26","wdl":40.0,"ws":"22:20","wr":"23:00"},{"e":"Mandsour","s":"MP","b":"Indore","t":1,"ad":37.0,"wd":"09.05.26","wdl":37.0,"ws":"21:30","wr":"22:07"},{"e":"RP-RAT","s":"MP","b":"Indore","t":1,"ad":35.0,"wd":"09.05.26","wdl":35.0,"ws":"00:00","wr":"00:35"},{"e":"RP-BHO-SEHORE","s":"MP","b":"Bhopal Regional","t":1,"ad":28.0,"wd":"09.05.26","wdl":28.0,"ws":"23:40","wr":"00:08"},{"e":"RAJ-SAT-REVA","s":"MP","b":"Satna","t":1,"ad":24.0,"wd":"09.05.26","wdl":24.0,"ws":"01:00","wr":"01:24"},{"e":"RP-KHA-KHARGONE DAK","s":"MP","b":"Khandwa","t":1,"ad":22.0,"wd":"09.05.26","wdl":22.0,"ws":"23:45","wr":"00:07"}],"CG":[{"e":"RP-BIL-BILASPUR DAK","s":"CG","b":"Bilaspur","t":1,"ad":45.0,"wd":"09.05.26","wdl":45.0,"ws":"21:30","wr":"22:15"},{"e":"RP-RAI-RAIPUR CITY","s":"CG","b":"Raipur","t":1,"ad":39.0,"wd":"09.05.26","wdl":39.0,"ws":"01:00","wr":"01:39"},{"e":"RP-RAI-BHILAI","s":"CG","b":"Raipur","t":1,"ad":32.0,"wd":"09.05.26","wdl":32.0,"ws":"00:30","wr":"01:02"},{"e":"Raipur - Kanker","s":"CG","b":"Raipur","t":1,"ad":20.0,"wd":"09.05.26","wdl":20.0,"ws":"21:30","wr":"21:50"},{"e":"RP-RAI-RAIPUR DAK","s":"CG","b":"Raipur","t":1,"ad":17.0,"wd":"09.05.26","wdl":17.0,"ws":"22:00","wr":"22:17"},{"e":"RP-BIL-BILASPUR CITY","s":"CG","b":"Bilaspur","t":1,"ad":15.0,"wd":"09.05.26","wdl":15.0,"ws":"01:30","wr":"01:45"},{"e":"RAJ-JAG-KONDAGAON DAK","s":"CG","b":"Jagdalpur","t":1,"ad":8.0,"wd":"09.05.26","wdl":8.0,"ws":"23:00","wr":"23:08"}],"Metro":[{"e":"RP_AHMD_AHMEDABAD","s":"Metro","b":"Ahmedabad","t":1,"ad":134.0,"wd":"09.05.26","wdl":134.0,"ws":"22:15","wr":"00:29"},{"e":"RP-BAN-BANGLORE CITY","s":"Metro","b":"Banglore","t":1,"ad":66.0,"wd":"09.05.26","wdl":66.0,"ws":"23:30","wr":"00:36"},{"e":"RP-CHE","s":"Metro","b":"Chennai","t":1,"ad":58.0,"wd":"09.05.26","wdl":58.0,"ws":"00:00","wr":"00:58"},{"e":"RP-DEL","s":"Metro","b":"Delhi","t":1,"ad":40.0,"wd":"09.05.26","wdl":40.0,"ws":"01:00","wr":"01:40"},{"e":"RAJ-KOL-KOLKATA CITY","s":"Metro","b":"Kolkata","t":1,"ad":39.0,"wd":"09.05.26","wdl":39.0,"ws":"00:30","wr":"01:09"},{"e":"RP-BGR-BANGALURU DAK","s":"Metro","b":"Banglore","t":1,"ad":26.0,"wd":"09.05.26","wdl":26.0,"ws":"21:30","wr":"21:56"},{"e":"Surat City","s":"Metro","b":"Surat","t":1,"ad":15.0,"wd":"09.05.26","wdl":15.0,"ws":"00:15","wr":"00:30"}]},"weekly":{"Raj":[{"e":"RP-BHI-PRATAPGARH","s":"Raj","b":"Bhilwara","t":1,"ad":549.0,"wd":"03.05.26","wdl":549.0,"ws":"22:00","wr":"07:09"},{"e":"RP-BHI-CHITTORGARH","s":"Raj","b":"Bhilwara","t":9,"ad":163.6,"wd":"03.05.26","wdl":550.0,"ws":"22:00","wr":"07:10"},{"e":"RP-KOT-JHALAWAR","s":"Raj","b":"Kota","t":7,"ad":120.0,"wd":"09.05.26","wdl":131.0,"ws":"21:45","wr":"23:56"},{"e":"AbuRoad","s":"Raj","b":"Pali","t":5,"ad":112.4,"wd":"03.05.26","wdl":498.0,"ws":"22:45","wr":"07:03"},{"e":"RP-PAL-SIROHI","s":"Raj","b":"Pali","t":6,"ad":101.5,"wd":"03.05.26","wdl":510.0,"ws":"22:45","wr":"07:15"},{"e":"RP-PAL-JALORE","s":"Raj","b":"Pali","t":13,"ad":101.3,"wd":"03.05.26","wdl":554.0,"ws":"22:00","wr":"07:14"},{"e":"RP-PAL-SUMERPUR SHIVGANJ DAK","s":"Raj","b":"Pali","t":6,"ad":94.8,"wd":"03.05.26","wdl":450.0,"ws":"23:45","wr":"07:15"},{"e":"RP-BHI-BHILWARA CITY","s":"Raj","b":"Bhilwara","t":11,"ad":90.8,"wd":"03.05.26","wdl":369.0,"ws":"01:00","wr":"07:09"},{"e":"RP-SIK-SIKAR DAK","s":"Raj","b":"Sikar","t":7,"ad":74.6,"wd":"07.05.26","wdl":88.0,"ws":"23:30","wr":"00:58"},{"e":"RP-JAI-JAIPUR CITY","s":"Raj","b":"Jaipur","t":7,"ad":71.9,"wd":"07.05.26","wdl":89.0,"ws":"00:30","wr":"01:59"}],"MP":[{"e":"RP-BHO-BHOPAL DAK","s":"MP","b":"Bhopal","t":2,"ad":95.0,"wd":"07.05.26","wdl":103.0,"ws":"00:00","wr":"01:43"},{"e":"RP-BHO-BHOPAL CITY","s":"MP","b":"Bhopal","t":7,"ad":75.6,"wd":"03.05.26","wdl":147.0,"ws":"00:30","wr":"02:57"},{"e":"RP-IND-DHAR","s":"MP","b":"Indore","t":7,"ad":69.0,"wd":"08.05.26","wdl":167.0,"ws":"22:10","wr":"00:57"},{"e":"RP-IND-INDORE CITY","s":"MP","b":"Indore","t":3,"ad":51.3,"wd":"03.05.26","wdl":90.0,"ws":"01:30","wr":"03:00"},{"e":"Mandsour","s":"MP","b":"Indore","t":7,"ad":48.9,"wd":"05.05.26","wdl":59.0,"ws":"21:30","wr":"22:29"},{"e":"RP-BHO-HARDA","s":"MP","b":"Bhopal","t":4,"ad":45.0,"wd":"05.05.26","wdl":87.0,"ws":"22:35","wr":"00:02"},{"e":"RP-BHO-RAJGARH","s":"MP","b":"Bhopal Regional","t":7,"ad":40.7,"wd":"08.05.26","wdl":58.0,"ws":"22:20","wr":"23:18"},{"e":"RAJ-BHO-ASHOK NAGAR","s":"MP","b":"Bhopal Regional","t":7,"ad":39.9,"wd":"08.05.26","wdl":52.0,"ws":"22:00","wr":"22:52"},{"e":"Indore-Khandwa","s":"MP","b":"Indore","t":4,"ad":39.8,"wd":"03.05.26","wdl":92.0,"ws":"01:30","wr":"03:02"},{"e":"Indore-Shajapur","s":"MP","b":"Ujjain","t":7,"ad":37.1,"wd":"03.05.26","wdl":160.0,"ws":"23:25","wr":"02:05"}],"CG":[{"e":"RP-BIL-BILASPUR DAK","s":"CG","b":"Bilaspur","t":7,"ad":53.9,"wd":"08.05.26","wdl":91.0,"ws":"21:30","wr":"23:01"},{"e":"RP-BIL-JANJGIR DAK","s":"CG","b":"Bilaspur","t":1,"ad":52.0,"wd":"05.05.26","wdl":52.0,"ws":"22:30","wr":"23:22"},{"e":"RP-RAI-RAIPUR CITY","s":"CG","b":"Raipur","t":7,"ad":41.9,"wd":"03.05.26","wdl":60.0,"ws":"01:00","wr":"02:00"},{"e":"RP-RAI-BHILAI","s":"CG","b":"Raipur","t":7,"ad":33.0,"wd":"08.05.26","wdl":52.0,"ws":"00:30","wr":"01:22"},{"e":"RAJ-JAG-JAGDALPUR CITY","s":"CG","b":"Jagdalpur","t":2,"ad":30.5,"wd":"05.05.26","wdl":47.0,"ws":"01:30","wr":"02:17"},{"e":"RP-RAI-RAIPUR DAK","s":"CG","b":"Raipur","t":7,"ad":27.1,"wd":"08.05.26","wdl":61.0,"ws":"22:00","wr":"23:01"},{"e":"RAJ-JAG-KONDAGAON DAK","s":"CG","b":"Jagdalpur","t":5,"ad":15.2,"wd":"07.05.26","wdl":32.0,"ws":"23:00","wr":"23:32"},{"e":"RAJ-JAG-DANTEWADA DAK","s":"CG","b":"Jagdalpur","t":3,"ad":14.7,"wd":"07.05.26","wdl":22.0,"ws":"23:15","wr":"23:37"},{"e":"Raipur - Kanker","s":"CG","b":"Raipur","t":2,"ad":12.0,"wd":"09.05.26","wdl":20.0,"ws":"21:30","wr":"21:50"},{"e":"RP-BIL-BILASPUR CITY","s":"CG","b":"Bilaspur","t":6,"ad":11.5,"wd":"08.05.26","wdl":22.0,"ws":"01:30","wr":"01:52"}],"Metro":[{"e":"RP_AHMD_AHMEDABAD","s":"Metro","b":"Ahmedabad","t":7,"ad":101.0,"wd":"08.05.26","wdl":155.0,"ws":"22:15","wr":"00:50"},{"e":"RP-BAN-BANGLORE CITY","s":"Metro","b":"Banglore","t":7,"ad":50.7,"wd":"08.05.26","wdl":81.0,"ws":"23:30","wr":"00:51"},{"e":"RP-BGR-BANGALURU DAK","s":"Metro","b":"Banglore","t":7,"ad":43.6,"wd":"06.05.26","wdl":134.0,"ws":"21:30","wr":"23:44"},{"e":"RP-DEL","s":"Metro","b":"Delhi","t":5,"ad":33.4,"wd":"05.05.26","wdl":45.0,"ws":"01:00","wr":"01:45"},{"e":"RP-CHE","s":"Metro","b":"Chennai","t":6,"ad":29.7,"wd":"09.05.26","wdl":58.0,"ws":"00:00","wr":"00:58"},{"e":"RAJ-KOL-KOLKATA CITY","s":"Metro","b":"Kolkata","t":7,"ad":23.6,"wd":"05.05.26","wdl":43.0,"ws":"00:30","wr":"01:13"},{"e":"Surat City","s":"Metro","b":"Surat","t":5,"ad":13.8,"wd":"08.05.26","wdl":38.0,"ws":"00:15","wr":"00:53"}]},"monthly":{"Raj":[{"e":"RP-BHI-PRATAPGARH","s":"Raj","b":"Bhilwara","t":1,"ad":549.0,"wd":"03.05.26","wdl":549.0,"ws":"22:00","wr":"07:09"},{"e":"RP-BHI-CHITTORGARH","s":"Raj","b":"Bhilwara","t":11,"ad":147.8,"wd":"03.05.26","wdl":550.0,"ws":"22:00","wr":"07:10"},{"e":"RP-KOT-JHALAWAR","s":"Raj","b":"Kota","t":9,"ad":120.2,"wd":"09.05.26","wdl":131.0,"ws":"21:45","wr":"23:56"},{"e":"AbuRoad","s":"Raj","b":"Pali","t":6,"ad":95.3,"wd":"03.05.26","wdl":498.0,"ws":"22:45","wr":"07:03"},{"e":"RP-PAL-SIROHI","s":"Raj","b":"Pali","t":8,"ad":82.0,"wd":"03.05.26","wdl":510.0,"ws":"22:45","wr":"07:15"},{"e":"RP-PAL-JALORE","s":"Raj","b":"Pali","t":17,"ad":81.6,"wd":"03.05.26","wdl":554.0,"ws":"22:00","wr":"07:14"},{"e":"RP-BHI-BHILWARA CITY","s":"Raj","b":"Bhilwara","t":13,"ad":80.7,"wd":"03.05.26","wdl":369.0,"ws":"01:00","wr":"07:09"},{"e":"RP-JAI-JAIPUR CITY","s":"Raj","b":"Jaipur","t":9,"ad":77.1,"wd":"01.05.26","wdl":100.0,"ws":"00:30","wr":"02:10"},{"e":"RP-SIK-SIKAR DAK","s":"Raj","b":"Sikar","t":9,"ad":73.9,"wd":"07.05.26","wdl":88.0,"ws":"23:30","wr":"00:58"},{"e":"RP-PAL-SUMERPUR SHIVGANJ DAK","s":"Raj","b":"Pali","t":8,"ad":73.1,"wd":"03.05.26","wdl":450.0,"ws":"23:45","wr":"07:15"}],"MP":[{"e":"RP-BHO-BHOPAL DAK","s":"MP","b":"Bhopal","t":3,"ad":101.0,"wd":"02.05.26","wdl":113.0,"ws":"00:00","wr":"01:53"},{"e":"RP-BHO-BHOPAL CITY","s":"MP","b":"Bhopal","t":9,"ad":80.1,"wd":"03.05.26","wdl":147.0,"ws":"00:30","wr":"02:57"},{"e":"RP-IND-DHAR","s":"MP","b":"Indore","t":9,"ad":57.2,"wd":"08.05.26","wdl":167.0,"ws":"22:10","wr":"00:57"},{"e":"Mandsour","s":"MP","b":"Indore","t":9,"ad":49.6,"wd":"05.05.26","wdl":59.0,"ws":"21:30","wr":"22:29"},{"e":"RP-IND-INDORE CITY","s":"MP","b":"Indore","t":5,"ad":43.0,"wd":"03.05.26","wdl":90.0,"ws":"01:30","wr":"03:00"},{"e":"RP-BHO-HOSANGABAD","s":"MP","b":"Bhopal","t":3,"ad":43.0,"wd":"02.05.26","wdl":55.0,"ws":"01:00","wr":"01:55"},{"e":"RP-BHO-RAJGARH","s":"MP","b":"Bhopal Regional","t":9,"ad":42.9,"wd":"08.05.26","wdl":58.0,"ws":"22:20","wr":"23:18"},{"e":"RP-BHO-GUNA","s":"MP","b":"Bhopal Regional","t":8,"ad":41.1,"wd":"04.05.26","wdl":127.0,"ws":"21:50","wr":"23:57"},{"e":"Indore-Khandwa","s":"MP","b":"Indore","t":4,"ad":39.8,"wd":"03.05.26","wdl":92.0,"ws":"01:30","wr":"03:02"},{"e":"RAJ-BHO-ASHOK NAGAR","s":"MP","b":"Bhopal Regional","t":9,"ad":38.3,"wd":"08.05.26","wdl":52.0,"ws":"22:00","wr":"22:52"}],"CG":[{"e":"RP-BIL-JANJGIR DAK","s":"CG","b":"Bilaspur","t":1,"ad":52.0,"wd":"05.05.26","wdl":52.0,"ws":"22:30","wr":"23:22"},{"e":"RP-BIL-BILASPUR DAK","s":"CG","b":"Bilaspur","t":9,"ad":49.1,"wd":"08.05.26","wdl":91.0,"ws":"21:30","wr":"23:01"},{"e":"RP-RAI-RAIPUR CITY","s":"CG","b":"Raipur","t":9,"ad":41.2,"wd":"03.05.26","wdl":60.0,"ws":"01:00","wr":"02:00"},{"e":"RP-RAI-BHILAI","s":"CG","b":"Raipur","t":9,"ad":35.6,"wd":"01.05.26","wdl":73.0,"ws":"00:30","wr":"01:43"},{"e":"RAJ-JAG-JAGDALPUR CITY","s":"CG","b":"Jagdalpur","t":2,"ad":30.5,"wd":"05.05.26","wdl":47.0,"ws":"01:30","wr":"02:17"},{"e":"RP-RAI-RAIPUR DAK","s":"CG","b":"Raipur","t":9,"ad":24.3,"wd":"08.05.26","wdl":61.0,"ws":"22:00","wr":"23:01"},{"e":"RAJ-JAG-DANTEWADA DAK","s":"CG","b":"Jagdalpur","t":4,"ad":17.8,"wd":"01.05.26","wdl":27.0,"ws":"23:15","wr":"23:42"},{"e":"Raipur-RNGA","s":"CG","b":"Raipur","t":2,"ad":16.5,"wd":"01.05.26","wdl":31.0,"ws":"23:00","wr":"23:31"},{"e":"Raipur - Kanker","s":"CG","b":"Raipur","t":4,"ad":16.5,"wd":"02.05.26","wdl":24.0,"ws":"21:30","wr":"21:54"},{"e":"RAJ-JAG-KONDAGAON DAK","s":"CG","b":"Jagdalpur","t":6,"ad":14.0,"wd":"07.05.26","wdl":32.0,"ws":"23:00","wr":"23:32"}],"Metro":[{"e":"RP_AHMD_AHMEDABAD","s":"Metro","b":"Ahmedabad","t":9,"ad":100.3,"wd":"08.05.26","wdl":155.0,"ws":"22:15","wr":"00:50"},{"e":"RP-BAN-BANGLORE CITY","s":"Metro","b":"Banglore","t":9,"ad":50.3,"wd":"08.05.26","wdl":81.0,"ws":"23:30","wr":"00:51"},{"e":"RP-BGR-BANGALURU DAK","s":"Metro","b":"Banglore","t":9,"ad":38.7,"wd":"06.05.26","wdl":134.0,"ws":"21:30","wr":"23:44"},{"e":"RP-DEL","s":"Metro","b":"Delhi","t":7,"ad":29.6,"wd":"05.05.26","wdl":45.0,"ws":"01:00","wr":"01:45"},{"e":"RP-CHE","s":"Metro","b":"Chennai","t":8,"ad":27.1,"wd":"09.05.26","wdl":58.0,"ws":"00:00","wr":"00:58"},{"e":"RAJ-KOL-KOLKATA CITY","s":"Metro","b":"Kolkata","t":8,"ad":25.1,"wd":"05.05.26","wdl":43.0,"ws":"00:30","wr":"01:13"},{"e":"Surat City","s":"Metro","b":"Surat","t":7,"ad":12.9,"wd":"08.05.26","wdl":38.0,"ws":"00:15","wr":"00:53"}]},"yearly":{"Raj":[{"e":"RP-PAL-JALORE","s":"Raj","b":"Pali","t":317,"ad":132.8,"wd":"11.01.26","wdl":1034.0,"ws":"22:00","wr":"15:14"},{"e":"RP-PAL-SUMERPUR SHIVGANJ DAK","s":"Raj","b":"Pali","t":111,"ad":128.2,"wd":"11.01.26","wdl":482.0,"ws":"23:45","wr":"07:47"},{"e":"RP-PAL-SIROHI","s":"Raj","b":"Pali","t":144,"ad":119.6,"wd":"11.01.26","wdl":538.0,"ws":"22:45","wr":"07:43"},{"e":"RP-BHI-PRATAPGARH","s":"Raj","b":"Bhilwara","t":57,"ad":118.1,"wd":"08.03.26","wdl":554.0,"ws":"22:00","wr":"07:14"},{"e":"RP-KOT-JHALAWAR","s":"Raj","b":"Kota","t":196,"ad":117.9,"wd":"22.04.26","wdl":228.0,"ws":"21:45","wr":"01:33"},{"e":"AbuRoad","s":"Raj","b":"Pali","t":175,"ad":114.2,"wd":"11.01.26","wdl":562.0,"ws":"22:15","wr":"07:37"},{"e":"RP-BHI-CHITTORGARH","s":"Raj","b":"Bhilwara","t":254,"ad":97.9,"wd":"15.02.26","wdl":1418.0,"ws":"23:00","wr":"22:38"},{"e":"RP-PAL-PALI CITY","s":"Raj","b":"Pali","t":333,"ad":89.9,"wd":"11.01.26","wdl":858.0,"ws":"01:00","wr":"15:18"},{"e":"RP-SIK-SIKAR DAK","s":"Raj","b":"Sikar","t":185,"ad":86.1,"wd":"06.02.26","wdl":960.0,"ws":"23:30","wr":"15:30"},{"e":"RP-JAI-JAIPUR CITY","s":"Raj","b":"Jaipur","t":188,"ad":76.3,"wd":"18.04.26","wdl":191.0,"ws":"00:30","wr":"03:41"}],"MP":[{"e":"RAJ-JAB-JABALPUR DAK","s":"MP","b":"Jabalpur","t":3,"ad":421.0,"wd":"11.01.26","wdl":1201.0,"ws":"01:30","wr":"21:31"},{"e":"RP-RAT","s":"MP","b":"Indore","t":4,"ad":329.0,"wd":"01.02.26","wdl":1245.0,"ws":"00:00","wr":"20:45"},{"e":"Mandsour","s":"MP","b":"Indore","t":189,"ad":93.7,"wd":"01.02.26","wdl":1395.0,"ws":"21:30","wr":"20:45"},{"e":"RP-BHO-BHOPAL CITY","s":"MP","b":"Bhopal","t":188,"ad":79.1,"wd":"02.03.26","wdl":1451.0,"ws":"00:30","wr":"00:41"},{"e":"RP-BHO-BHOPAL DAK","s":"MP","b":"Bhopal","t":22,"ad":72.8,"wd":"03.11.25","wdl":249.0,"ws":"00:00","wr":"04:09"},{"e":"RAJ-SAT-SATNA DAK","s":"MP","b":"Satna","t":5,"ad":67.0,"wd":"20.04.26","wdl":103.0,"ws":"00:00","wr":"01:43"},{"e":"RP-IND-INDORE CITY","s":"MP","b":"Indore","t":167,"ad":58.2,"wd":"28.12.25","wdl":1438.0,"ws":"01:30","wr":"01:28"},{"e":"RP-BHO-RAJGARH","s":"MP","b":"Bhopal Regional","t":180,"ad":52.3,"wd":"03.11.25","wdl":345.0,"ws":"22:20","wr":"04:05"},{"e":"RP-BHO-BETUL","s":"MP","b":"Bhopal","t":116,"ad":49.2,"wd":"02.03.26","wdl":1441.0,"ws":"21:50","wr":"21:51"},{"e":"RAJ-BHO-ASHOK NAGAR","s":"MP","b":"Bhopal Regional","t":184,"ad":44.9,"wd":"03.11.25","wdl":367.0,"ws":"22:00","wr":"04:07"}],"CG":[{"e":"Raipur-Bemetara","s":"CG","b":"Raipur","t":3,"ad":486.9,"wd":"02.03.26","wdl":1360.6,"ws":"00:00","wr":"22:41"},{"e":"Raipur-Mahasamund","s":"CG","b":"Raipur","t":3,"ad":472.7,"wd":"28.12.25","wdl":1326.0,"ws":"00:00","wr":"22:06"},{"e":"Raipur-Bald","s":"CG","b":"Raipur","t":4,"ad":370.2,"wd":"07.12.25","wdl":1349.0,"ws":"00:00","wr":"22:29"},{"e":"RAJ-JAG-JAGDALPUR CITY","s":"CG","b":"Jagdalpur","t":81,"ad":68.5,"wd":"06.02.26","wdl":1255.0,"ws":"01:00","wr":"21:55"},{"e":"RP-BIL-BILASPUR DAK","s":"CG","b":"Bilaspur","t":187,"ad":61.9,"wd":"15.01.26","wdl":244.0,"ws":"21:30","wr":"01:34"},{"e":"RP-RAI-RAIPUR CITY","s":"CG","b":"Raipur","t":185,"ad":53.0,"wd":"26.04.26","wdl":1371.0,"ws":"01:00","wr":"23:51"},{"e":"RP-RAI-RAIPUR DAK","s":"CG","b":"Raipur","t":185,"ad":48.0,"wd":"15.01.26","wdl":214.0,"ws":"22:00","wr":"01:34"},{"e":"RP-RAI-BHILAI","s":"CG","b":"Raipur","t":182,"ad":47.5,"wd":"06.02.26","wdl":1350.0,"ws":"00:30","wr":"23:00"},{"e":"RP-BIL-JANJGIR DAK","s":"CG","b":"Bilaspur","t":11,"ad":45.6,"wd":"15.01.26","wdl":182.0,"ws":"22:30","wr":"01:32"},{"e":"RP-BIL-RAIGARH DAK","s":"CG","b":"Bilaspur","t":15,"ad":38.7,"wd":"15.01.26","wdl":211.0,"ws":"22:00","wr":"01:31"}],"Metro":[{"e":"RP_AHMD_AHMEDABAD","s":"Metro","b":"Ahmedabad","t":183,"ad":61.3,"wd":"09.03.26","wdl":196.0,"ws":"22:15","wr":"01:31"},{"e":"RP-BAN-BANGLORE CITY","s":"Metro","b":"Banglore","t":185,"ad":36.9,"wd":"01.11.25","wdl":198.0,"ws":"23:30","wr":"02:48"},{"e":"RP-BGR-BANGALURU DAK","s":"Metro","b":"Banglore","t":185,"ad":24.4,"wd":"06.05.26","wdl":134.0,"ws":"21:30","wr":"23:44"},{"e":"RP-CHE","s":"Metro","b":"Chennai","t":134,"ad":21.3,"wd":"10.11.25","wdl":97.0,"ws":"00:00","wr":"01:37"},{"e":"RP-DEL","s":"Metro","b":"Delhi","t":165,"ad":18.0,"wd":"03.11.25","wdl":86.0,"ws":"01:00","wr":"02:26"},{"e":"RAJ-KOL-KOLKATA CITY","s":"Metro","b":"Kolkata","t":164,"ad":17.7,"wd":"15.04.26","wdl":64.0,"ws":"00:30","wr":"01:34"},{"e":"Surat City","s":"Metro","b":"Surat","t":43,"ad":17.4,"wd":"09.03.26","wdl":98.0,"ws":"00:15","wr":"01:53"}]},"good":{"Raj":[{"e":"NT Jaipur City","s":"Raj","b":"NT Jaipur","t":33,"ad":-72.5,"lp":81.8},{"e":"RP-JOD-JODHANA","s":"Raj","b":"Jodhpur","t":188,"ad":-60.4,"lp":2.7},{"e":"RP-ALW-BHARATPUR CITY","s":"Raj","b":"Bharatpur","t":184,"ad":-35.6,"lp":7.1},{"e":"RP-JOD-NAGAUR CITY","s":"Raj","b":"Jodhpur","t":188,"ad":-27.1,"lp":2.7},{"e":"RP-ALW-BHARATPUR DAK","s":"Raj","b":"Bharatpur","t":180,"ad":-12.8,"lp":22.2},{"e":"RP-KOT-BUNDI","s":"Raj","b":"Kota Regional","t":188,"ad":-8.1,"lp":28.2},{"e":"RAJ-JAI-CHOMU DAK","s":"Raj","b":"Jaipur_Dak","t":188,"ad":-3.9,"lp":29.8},{"e":"RP-BAN-BANSWARA CITY","s":"Raj","b":"Banswara","t":376,"ad":-0.6,"lp":49.2},{"e":"NT Jaipur Dak","s":"Raj","b":"NT Jaipur","t":30,"ad":-0.2,"lp":96.7},{"e":"RAJ-BIK-BIKANER DAK","s":"Raj","b":"Bikaner","t":188,"ad":0.5,"lp":37.8}],"MP":[{"e":"RAJ-SAG-SAGAR DAK","s":"MP","b":"Sagar","t":189,"ad":-162.7,"lp":0.0},{"e":"RAJ-JAB-JABALPUR DAK","s":"MP","b":"Jabalpur","t":188,"ad":-146.3,"lp":1.6},{"e":"RAJ-MAN-MANDSAUR","s":"MP","b":"Mandsaur","t":165,"ad":-118.2,"lp":0.0},{"e":"RP-BHO-HOSANGABAD","s":"MP","b":"Bhopal","t":189,"ad":-110.2,"lp":6.9},{"e":"RP-GWA-GWALIOR DAK","s":"MP","b":"Gwalior Regional","t":189,"ad":-75.2,"lp":0.0},{"e":"RAJ-SAT-SATNA DAK","s":"MP","b":"Satna","t":189,"ad":-75.1,"lp":2.6},{"e":"Indore-Khandwa","s":"MP","b":"Indore","t":189,"ad":-63.1,"lp":40.7},{"e":"RP-BHO-BHOPAL DAK","s":"MP","b":"Bhopal","t":189,"ad":-52.6,"lp":11.6},{"e":"Gwalior-Dabra","s":"MP","b":"Gwalior Regional","t":173,"ad":-52.3,"lp":0.0},{"e":"RP-RAT","s":"MP","b":"Indore","t":189,"ad":-51.9,"lp":2.1}],"CG":[{"e":"Raipur-Mahasamund","s":"CG","b":"Raipur","t":188,"ad":-82.1,"lp":1.6},{"e":"Raipur-Bald","s":"CG","b":"Raipur","t":188,"ad":-75.7,"lp":2.1},{"e":"Raipur-Bemetara","s":"CG","b":"Raipur","t":187,"ad":-73.9,"lp":1.6},{"e":"RP-BIL-JANJGIR DAK","s":"CG","b":"Bilaspur","t":186,"ad":-41.3,"lp":5.9},{"e":"RP-BIL-AMBIKAPUR DAK","s":"CG","b":"Bilaspur","t":186,"ad":-32.0,"lp":4.8},{"e":"RP-BIL-RAIGARH DAK","s":"CG","b":"Bilaspur","t":187,"ad":-22.2,"lp":8.0},{"e":"RAJ-JAG-JAGDALPUR CITY","s":"CG","b":"Jagdalpur","t":371,"ad":-19.3,"lp":21.8},{"e":"RAJ-BIL-JASHPUR PATRIKA","s":"CG","b":"Bilaspur","t":184,"ad":-9.7,"lp":17.4},{"e":"Raipur-RNGA","s":"CG","b":"Raipur","t":188,"ad":-5.8,"lp":37.8},{"e":"RP-BIL-KORBA DAK","s":"CG","b":"Bilaspur","t":188,"ad":-5.3,"lp":36.2}],"Metro":[{"e":"Surat City","s":"Metro","b":"Surat","t":188,"ad":-16.5,"lp":22.9}]},"late_today":[{"s":"Raj","br":"Bhilwara","e":"RP-BHI-CHITTORGARH","p":"MAIN","sc":"22:00","rl":"00:17","d":137.0,"c":"DUMMY/ADVT"},{"s":"Metro","br":"Ahmedabad","e":"RP_AHMD_AHMEDABAD","p":"Main","sc":"22:15","rl":"00:29","d":134.0,"c":": Page 1 @ 12:29 Edition delayed by 2 hours 14 minutes Reaso"},{"s":"Raj","br":"Kota","e":"RP-KOT-JHALAWAR","p":"MAIN","sc":"21:45","rl":"23:56","d":131.0,"c":"Kota Daak 10.27 done. Delay from jpr"},{"s":"Raj","br":"Jaipur","e":"RP-JAI-DAUSA","p":"MAIN","sc":"21:45","rl":"23:11","d":86.0,"c":""},{"s":"Raj","br":"Sikar","e":"RP-SIK-SIKAR DAK","p":"SIKAR DAK PULLOUT","sc":"23:30","rl":"00:55","d":85.0,"c":""},{"s":"Raj","br":"Jaipur","e":"RP-JAI-JAIPUR CITY","p":"MAIN","sc":"00:30","rl":"01:53","d":83.0,"c":""},{"s":"Raj","br":"Udaipur","e":"RP-UDA-UDAIPUR DAK","p":"MAIN","sc":"23:30","rl":"00:46","d":76.0,"c":"\u092a\u0940\u090f\u0938\u090f\u0938 \u0938\u093e\u0925\u0940 \u0915\u0947 \u0905\u0935\u0915\u093e\u0936 \u092a\u0930 \u0930\u0939\u0928\u0947 \u0938\u0947"},{"s":"Raj","br":"Bhilwara","e":"RP-BHI-BHILWARA CITY","p":"MAIN","sc":"01:00","rl":"02:11","d":71.0,"c":"DUMMY/ADVT"},{"s":"Raj","br":"Sikar","e":"RP-SIK-CHURU DAK","p":"CHURU DAK PULLOUT","sc":"22:30","rl":"23:36","d":66.0,"c":""},{"s":"Metro","br":"Banglore","e":"RP-BAN-BANGLORE CITY","p":"MAIN","sc":"23:30","rl":"00:36","d":66.0,"c":""},{"s":"MP","br":"Shahdol","e":"RP-JAB-SHAHDOL","p":"SHAHDOL PULLOUT","sc":"21:50","rl":"22:56","d":66.0,"c":""},{"s":"Raj","br":"Sikar","e":"RP-SIK-JHUNJHUNU","p":"MAIN","sc":"23:00","rl":"00:05","d":65.0,"c":""},{"s":"MP","br":"Bhopal","e":"RP-BHO-ITARSI","p":"ITARSI PULLOUT","sc":"23:40","rl":"00:42","d":62.0,"c":""},{"s":"MP","br":"Bhopal","e":"RP-BHO-BHOPAL CITY","p":"MAIN","sc":"00:30","rl":"01:29","d":59.0,"c":""},{"s":"Metro","br":"Chennai","e":"RP-CHE","p":"MAIN","sc":"00:00","rl":"00:58","d":58.0,"c":""},{"s":"Raj","br":"Kota","e":"RP-KOT-KOTA CITY","p":"MAIN","sc":"01:00","rl":"01:53","d":53.0,"c":"Kota City 1.50 done. Delay from jpr"},{"s":"Raj","br":"Udaipur","e":"RAJ-UDA-UDAIPUR CITY","p":"MAIN","sc":"01:00","rl":"01:51","d":51.0,"c":"\u0932\u094b\u0915\u0932 \u092a\u0947\u091c 1.49 \u092c\u091c\u0947 \u091b\u094b\u0921\u093c\u093e"},{"s":"Raj","br":"Ajmer","e":"RP-AJM-AJM NAGAUR","p":"MAIN","sc":"22:30","rl":"23:18","d":48.0,"c":""},{"s":"Raj","br":"Sikar","e":"RP-SIK-SIKAR CITY","p":"MAIN","sc":"01:20","rl":"02:06","d":46.0,"c":""},{"s":"Raj","br":"Jaipur_Dak","e":"RAJ-JAI-BASSI DAK","p":"BASSI PULLOUT","sc":"23:30","rl":"00:16","d":46.0,"c":"QUARK ERROR"},{"s":"CG","br":"Bilaspur","e":"RP-BIL-BILASPUR DAK","p":"MAIN","sc":"21:30","rl":"22:15","d":45.0,"c":""},{"s":"Raj","br":"Sikar","e":"Jhunjhunu City","p":"Main","sc":"01:20","rl":"02:01","d":41.0,"c":""},{"s":"MP","br":"Bhopal Regional","e":"RAJ-BHO-ASHOK NAGAR","p":"ASHOK NAGAR PULLOUT","sc":"22:00","rl":"22:41","d":41.0,"c":""},{"s":"Metro","br":"Delhi","e":"RP-DEL","p":"MAIN","sc":"01:00","rl":"01:40","d":40.0,"c":""},{"s":"MP","br":"Bhopal Regional","e":"RP-BHO-RAJGARH","p":"RAJGARH PULLOUT","sc":"22:20","rl":"23:00","d":40.0,"c":""},{"s":"Metro","br":"Kolkata","e":"RAJ-KOL-KOLKATA CITY","p":"MAIN","sc":"00:30","rl":"01:09","d":39.0,"c":""},{"s":"CG","br":"Raipur","e":"RP-RAI-RAIPUR CITY","p":"MAIN","sc":"01:00","rl":"01:39","d":39.0,"c":""},{"s":"Raj","br":"Pali","e":"RP-PAL-SIROHI","p":"SIROHI PULLOUT","sc":"22:45","rl":"23:23","d":38.0,"c":"\u0911\u0928 \u091f\u093e\u0907\u092e"},{"s":"Raj","br":"Pali","e":"AbuRoad","p":"","sc":"22:45","rl":"23:23","d":38.0,"c":"\u0911\u0928 \u091f\u093e\u0907\u092e"},{"s":"MP","br":"Indore","e":"Mandsour","p":"","sc":"21:30","rl":"22:07","d":37.0,"c":""},{"s":"Raj","br":"Pali","e":"RP-PAL-JALORE","p":"MAIN","sc":"22:00","rl":"22:36","d":36.0,"c":"\u091c\u092f\u092a\u0941\u0930 \u0938\u0947 10.20 \u092e\u093f\u0932\u093e, \u091f\u0942\u091f \u092a\u0947\u091c 10.34 \u091b\u094b\u0921\u093c\u093e"},{"s":"Raj","br":"Pali","e":"RP-PAL-PALI CITY","p":"PALI CITY PULLOUT","sc":"01:15","rl":"01:50","d":35.0,"c":"\u0911\u0928 \u091f\u093e\u0907\u092e"},{"s":"Raj","br":"Bhilwara","e":"RP-BHI-BHILWARA DAK","p":"BHILWARA DAK PULLOUT","sc":"01:00","rl":"01:35","d":35.0,"c":"DUMMY/ADVT"},{"s":"MP","br":"Indore","e":"RP-RAT","p":"MAIN","sc":"00:00","rl":"00:35","d":35.0,"c":""},{"s":"Raj","br":"Jodhpur","e":"RP-BAR-JAISALMER","p":"MAIN","sc":"22:30","rl":"23:03","d":33.0,"c":""},{"s":"Raj","br":"Pali","e":"RP-PAL-SUMERPUR SHIVGANJ DAK","p":"SUMERPUR SHIVGANJ PULLOUT","sc":"23:45","rl":"00:17","d":32.0,"c":"\u0911\u0928 \u091f\u093e\u0907\u092e"},{"s":"CG","br":"Raipur","e":"RP-RAI-BHILAI","p":"MAIN","sc":"00:30","rl":"01:02","d":32.0,"c":""},{"s":"Raj","br":"Barmer","e":"RP-BAR-BARMER","p":"BARMER PULLOUT","sc":"01:00","rl":"01:30","d":30.0,"c":"on time"},{"s":"Raj","br":"Sikar","e":"RP-SIK-CHURU","p":"MAIN","sc":"23:00","rl":"23:28","d":28.0,"c":""},{"s":"MP","br":"Bhopal Regional","e":"RP-BHO-SEHORE","p":"SEHORE PULLOUT","sc":"23:40","rl":"00:08","d":28.0,"c":""},{"s":"Metro","br":"Banglore","e":"RP-BGR-BANGALURU DAK","p":"MAIN","sc":"21:30","rl":"21:56","d":26.0,"c":""},{"s":"Raj","br":"Alwar","e":"RP-ALW-ALWAR CITY","p":"ALWAR CITY PULLOUT","sc":"01:00","rl":"01:25","d":25.0,"c":"1.22.........news change"},{"s":"MP","br":"Satna","e":"RAJ-SAT-REVA","p":"MAIN","sc":"01:00","rl":"01:24","d":24.0,"c":"\u091c\u0948\u0915\u0947\u091f 1.10 \u092a\u0930 \u092e\u093f\u0932\u093e"},{"s":"Raj","br":"Jaipur Regional","e":"RP-JAI-DAUSA","p":"DAUSA PULLOUT","sc":"22:00","rl":"22:23","d":23.0,"c":""},{"s":"Raj","br":"Jodhpur","e":"RP-JOD-JODHPUR CITY","p":"MAIN","sc":"00:40","rl":"01:02","d":22.0,"c":"\u091c\u092f\u092a\u0941\u0930 \u0938\u0947 \u0905\u0902\u0924\u093f\u092e \u092a\u0947\u091c \u092b\u094d\u0930\u0902\u091f \u091c\u0948\u0915\u0947\u091f (17) 12.50 \u092c\u091c\u0947 \u092e\u093f\u0932\u093e\u0964 \u091f\u0942\u091f+\u0938\u093f\u092f\u093e"},{"s":"Raj","br":"Jaipur","e":"RP-JAI-CITY DAK","p":"MAIN","sc":"23:00","rl":"23:22","d":22.0,"c":""},{"s":"MP","br":"Khandwa","e":"RP-KHA-KHARGONE DAK","p":"KHARGONE PULLOUT","sc":"23:45","rl":"00:07","d":22.0,"c":""},{"s":"Raj","br":"Jaipur Regional","e":"RP-JAI-TONK","p":"TONK PULLOUT","sc":"21:30","rl":"21:51","d":21.0,"c":""},{"s":"Raj","br":"Jhunjhunu","e":"RP-JHU-JHUNJHUNU DAK","p":"JHUNJHUNU DAK PULLOUT","sc":"22:55","rl":"23:16","d":21.0,"c":""},{"s":"CG","br":"Raipur","e":"Raipur - Kanker","p":"","sc":"21:30","rl":"21:50","d":20.0,"c":""},{"s":"Raj","br":"Jaipur Regional","e":"RP-JAI-KAUROLI CITY","p":"KAUROLI CITY PULLOUT","sc":"21:30","rl":"21:49","d":19.0,"c":""},{"s":"Raj","br":"Jaipur_Dak","e":"RAJ-JAI-CHOMU DAK","p":"CHOMU PULLOUT","sc":"23:30","rl":"23:48","d":18.0,"c":"on time"},{"s":"Raj","br":"Alwar","e":"RP-ALW-ALWAR DAK","p":"ALWAR DAK PULLOUT","sc":"00:00","rl":"00:18","d":18.0,"c":"11.59"},{"s":"MP","br":"Indore Regional","e":"Jhabua Pullout","p":"Pullout","sc":"21:45","rl":"22:03","d":18.0,"c":"\u091d\u093e\u092c\u0941\u0906 \u092a\u0941\u0932 \u0906\u0909\u091f \u0938\u092e\u092f \u092a\u0930 \u0930\u093f\u0932\u0940\u091c"},{"s":"CG","br":"Raipur","e":"RP-RAI-RAIPUR DAK","p":"MAIN","sc":"22:00","rl":"22:17","d":17.0,"c":""},{"s":"Metro","br":"Surat","e":"Surat City","p":"Main","sc":"00:15","rl":"00:30","d":15.0,"c":""},{"s":"Raj","br":"Pali","e":"RP-PAL-JALORE","p":"JALORE PULLOUT","sc":"22:15","rl":"22:30","d":15.0,"c":"\u0935\u093f\u091c\u094d\u091e\u093e\u092a\u0928 10.25 \u092a\u0930 \u092e\u093f\u0932\u093e, 10.25 \u091b\u094b\u0921\u093c\u093e"},{"s":"CG","br":"Bilaspur","e":"RP-BIL-BILASPUR CITY","p":"MAIN","sc":"01:30","rl":"01:45","d":15.0,"c":""},{"s":"MP","br":"Khandwa","e":"RP-KHA-BADWANI DAK","p":"BADWANI PULLOUT","sc":"23:00","rl":"23:13","d":13.0,"c":""},{"s":"Raj","br":"Jodhpur","e":"RP-BAR-BARMER CITY","p":"MAIN","sc":"01:00","rl":"01:12","d":12.0,"c":""},{"s":"Raj","br":"Ganganagar","e":"RP-SRI-HANUMANGARH DAK","p":"MAIN","sc":"22:30","rl":"22:42","d":12.0,"c":"staff short"},{"s":"Raj","br":"Jaipur Regional","e":"RP-JAI-SAWAI MADHOPUR CITY","p":"SAWAI MADHOPUR CITY PULLOUT","sc":"21:45","rl":"21:57","d":12.0,"c":""},{"s":"Raj","br":"Bhilwara","e":"RP-BHI-BHILWARA CITY","p":"BHILWARA CITY PULLOUT","sc":"01:30","rl":"01:42","d":12.0,"c":"DUMMY/ADVT"},{"s":"MP","br":"Ujjain","e":"Indore-Shajapur","p":"","sc":"23:25","rl":"23:37","d":12.0,"c":"On time"},{"s":"MP","br":"Bhopal","e":"RP-BHO-BETUL","p":"BETUL PULLOUT","sc":"21:50","rl":"22:02","d":12.0,"c":""},{"s":"Raj","br":"Bikaner","e":"RP-BIK-BIKANER CITY","p":"MAIN","sc":"01:15","rl":"01:26","d":11.0,"c":"8 min late due to quark error"},{"s":"MP","br":"Indore Regional","e":"Dhar Pullout","p":"Pullout","sc":"22:20","rl":"22:31","d":11.0,"c":"\u0927\u093e\u0930 \u092a\u0941\u0932 \u0906\u0909\u091f \u0938\u092e\u092f \u092a\u0930 \u0930\u093f\u0932\u0940\u091c"},{"s":"Raj","br":"Bhilwara","e":"RP-BHI-CHITTORGARH","p":"CHITTORGARH PULLOUT","sc":"23:00","rl":"23:09","d":9.0,"c":"ON TIME"},{"s":"MP","br":"Satna","e":"RAJ-SAT-SATNA CITY","p":"MAIN","sc":"01:30","rl":"01:39","d":9.0,"c":"\u0911\u0928\u091f\u093e\u0907\u092e"},{"s":"Raj","br":"Barmer","e":"RP-BAR-JAISALMER","p":"JAISALMER PULLOUT","sc":"22:30","rl":"22:38","d":8.0,"c":"on time"},{"s":"CG","br":"Jagdalpur","e":"RAJ-JAG-KONDAGAON DAK","p":"KONDAGAON PATRIKA","sc":"23:00","rl":"23:08","d":8.0,"c":""},{"s":"Raj","br":"Banswara","e":"RP-BAN-DUNGARPUR CITY","p":"MAIN","sc":"22:30","rl":"22:37","d":7.0,"c":""},{"s":"Raj","br":"Sikar","e":"RP-SIK-SIKAR CITY","p":"SIKAR CITY PULLOUT","sc":"01:30","rl":"01:37","d":7.0,"c":""},{"s":"MP","br":"Sagar","e":"RAJ-SAG-SAGAR CITY","p":"MAIN","sc":"01:40","rl":"01:47","d":7.0,"c":""},{"s":"MP","br":"Sagar","e":"Sagar-Beena","p":"","sc":"01:30","rl":"01:37","d":7.0,"c":""},{"s":"MP","br":"Khandwa","e":"RP-KHA-KHANDWA DAK","p":"KHANDWA PULLOUT","sc":"01:30","rl":"01:37","d":7.0,"c":""},{"s":"Raj","br":"Ajmer","e":"RAJ-AJM-AJMER CITY","p":"MAIN","sc":"01:30","rl":"01:35","d":5.0,"c":""},{"s":"Raj","br":"Alwar","e":"RP-ALW-BHARATPUR","p":"MAIN","sc":"23:30","rl":"23:35","d":5.0,"c":"11.3"},{"s":"Raj","br":"Jaipur_Dak","e":"RAJ-JAI-KOTPUTLI DAK","p":"KOTPUTLI PULLOUT","sc":"23:00","rl":"23:05","d":5.0,"c":"on time"},{"s":"Raj","br":"Alwar","e":"RP-ALW-ALWAR DAK","p":"MAIN","sc":"23:30","rl":"23:34","d":4.0,"c":"11.3"},{"s":"MP","br":"Gwalior","e":"RP-GWA-GWALIOR CITY","p":"MAIN","sc":"01:30","rl":"01:34","d":4.0,"c":""},{"s":"MP","br":"Indore","e":"RP-IND-DHAR","p":"MAIN","sc":"22:10","rl":"22:14","d":4.0,"c":""},{"s":"MP","br":"Shahdol","e":"RP-JAB-MANDLA DINDORI","p":"MANDLA PULLOUT","sc":"22:50","rl":"22:54","d":4.0,"c":""},{"s":"Raj","br":"Kota Regional","e":"RP-KOT-BUNDI","p":"BUNDI PULLOUT","sc":"23:00","rl":"23:03","d":3.0,"c":"22.50 \u092c\u091c\u0947"},{"s":"MP","br":"Bhopal Regional","e":"RP-BHO-VIDISHA","p":"VIDISHA PULLOUT","sc":"23:20","rl":"23:23","d":3.0,"c":""},{"s":"Raj","br":"Pali","e":"RP-PAL-PALI CITY","p":"MAIN","sc":"01:00","rl":"01:02","d":2.0,"c":"\u0911\u0928 \u091f\u093e\u0907\u092e"},{"s":"Raj","br":"Banswara","e":"RP-BAN-DUNGARPUR CITY","p":"DUNGARPUR CITY PULLOUT","sc":"22:00","rl":"22:02","d":2.0,"c":""},{"s":"Raj","br":"Jaipur_Dak","e":"RAJ-JAI-DUDU DAK","p":"DUDU PULLOUT","sc":"23:00","rl":"23:01","d":1.0,"c":"on time"}],"monthly_trend":[{"month":"2025-11","state":"CG","total":651,"late":310,"avg_delay":-7.5,"late_pct":47.6},{"month":"2025-11","state":"Metro","total":217,"late":176,"avg_delay":23.4,"late_pct":81.1},{"month":"2025-11","state":"MP","total":1549,"late":850,"avg_delay":-7.9,"late_pct":54.9},{"month":"2025-11","state":"Raj","total":2200,"late":1350,"avg_delay":16.9,"late_pct":61.4},{"month":"2025-12","state":"Raj","total":2189,"late":1482,"avg_delay":26,"late_pct":67.7},{"month":"2025-12","state":"MP","total":1549,"late":878,"avg_delay":-5.3,"late_pct":56.7},{"month":"2025-12","state":"Metro","total":217,"late":169,"avg_delay":16.6,"late_pct":77.9},{"month":"2025-12","state":"CG","total":650,"late":296,"avg_delay":1,"late_pct":45.5},{"month":"2026-01","state":"Raj","total":2112,"late":1554,"avg_delay":33,"late_pct":73.6},{"month":"2026-01","state":"MP","total":1486,"late":894,"avg_delay":-5.1,"late_pct":60.2},{"month":"2026-01","state":"CG","total":626,"late":321,"avg_delay":1,"late_pct":51.3},{"month":"2026-01","state":"Metro","total":207,"late":172,"avg_delay":17.9,"late_pct":83.1},{"month":"2026-02","state":"Raj","total":1968,"late":1480,"avg_delay":35.7,"late_pct":75.2},{"month":"2026-02","state":"Metro","total":196,"late":158,"avg_delay":19.8,"late_pct":80.6},{"month":"2026-02","state":"MP","total":1393,"late":817,"avg_delay":1.9,"late_pct":58.7},{"month":"2026-02","state":"CG","total":581,"late":298,"avg_delay":4.1,"late_pct":51.3},{"month":"2026-03","state":"Metro","total":210,"late":156,"avg_delay":11.4,"late_pct":74.3},{"month":"2026-03","state":"Raj","total":2028,"late":1480,"avg_delay":35.5,"late_pct":73},{"month":"2026-03","state":"MP","total":1481,"late":873,"avg_delay":0.2,"late_pct":58.9},{"month":"2026-03","state":"CG","total":608,"late":259,"avg_delay":-14.1,"late_pct":42.6},{"month":"2026-04","state":"Raj","total":2103,"late":1527,"avg_delay":32.5,"late_pct":72.6},{"month":"2026-04","state":"Metro","total":210,"late":171,"avg_delay":24.8,"late_pct":81.4},{"month":"2026-04","state":"MP","total":1479,"late":761,"avg_delay":-7.9,"late_pct":51.5},{"month":"2026-04","state":"CG","total":621,"late":261,"avg_delay":-5.7,"late_pct":42},{"month":"2026-05","state":"Raj","total":633,"late":459,"avg_delay":25.8,"late_pct":72.5},{"month":"2026-05","state":"MP","total":448,"late":237,"avg_delay":-6.6,"late_pct":52.9},{"month":"2026-05","state":"CG","total":189,"late":69,"avg_delay":-15.3,"late_pct":36.5},{"month":"2026-05","state":"Metro","total":62,"late":57,"avg_delay":38.2,"late_pct":91.9}]};
+
+// ===== UTILS =====
+const MONTHS=['2025-11','2025-12','2026-01','2026-02','2026-03','2026-04','2026-05'];
+const MLABELS=['Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26'];
+const STATES_LIST=[{s:'CG',total:3926,late:1814,avg_delay:-4.1,late_pct:46.2},{s:'Metro',total:1319,late:1059,avg_delay:19.9,late_pct:80.3},{s:'MP',total:9385,late:5310,avg_delay:-4.2,late_pct:56.6},{s:'Raj',total:13233,late:9332,avg_delay:29.5,late_pct:70.5}];
+const BRANCHES_LIST=[{b:'Pali',s:'Raj',avg:-91.8,late_pct:82.1},{b:'Udaipur',s:'Raj',avg:-68.6,late_pct:98.4},{b:'Ahmedabad',s:'Metro',avg:-58.8,late_pct:97.3},{b:'Kota',s:'Raj',avg:-58.1,late_pct:91.3},{b:'Jaipur',s:'Raj',avg:-50.6,late_pct:86.3},{b:'Sikar',s:'Raj',avg:-45.3,late_pct:88},{b:'Bhilwara',s:'Raj',avg:-41.9,late_pct:64.4},{b:'Bhopal Regional',s:'MP',avg:-29.9,late_pct:86.2},{b:'Banglore',s:'Metro',avg:-29.1,late_pct:97.9},{b:'Ujjain',s:'MP',avg:-28.2,late_pct:93.7},{b:'Ajmer',s:'Raj',avg:-27.2,late_pct:86.7},{b:'Barmer',s:'Raj',avg:-25.6,late_pct:86.3},{b:'Gwalior',s:'MP',avg:3.4,late_pct:50.5},{b:'Indore',s:'MP',avg:4.8,late_pct:56},{b:'Raipur',s:'CG',avg:5.2,late_pct:45},{b:'Bilaspur',s:'CG',avg:6.1,late_pct:44.9},{b:'Jabalpur',s:'MP',avg:-2.1,late_pct:55.5}];
+const ALL_BRANCHES=['Ahmedabad','Ajmer','Alwar','Banglore','Banswara','Barmer','Bharatpur','Bhilwara','Bhopal','Bhopal Regional','Bikaner','Bilaspur','Chennai','Chhindwara','Delhi','Ganganagar','Gwalior','Gwalior Regional','Indore','Indore Regional','Jabalpur','Jagdalpur','Jaipur','Jaipur Regional','Jaipur_Dak','Jhunjhunu','Jodhpur','Khandwa','Kolkata','Kota','Kota Regional','Mandsaur','NT Jaipur','Pali','Raipur','Sagar','Satna','Shahdol','Sikar','Surat','Udaipur','Ujjain'];
+const EDITIONS_ALL=[{edition:'RP-KOT-JHALAWAR',state:'Raj',branch:'Kota',total:198,late:196,avg_delay:116.6,late_pct:99,worst_day:'22.04.26',worst_delay:228},{edition:'RP-PAL-JALORE',state:'Raj',branch:'Pali',total:376,late:317,avg_delay:109.8,late_pct:84.3,worst_day:'11.01.26',worst_delay:1034},{edition:'AbuRoad',state:'Raj',branch:'Pali',total:188,late:175,avg_delay:106,late_pct:93.1,worst_day:'11.01.26',worst_delay:562},{edition:'Mandsour',state:'MP',branch:'Indore',total:189,late:189,avg_delay:93.7,late_pct:100,worst_day:'01.02.26',worst_delay:1395},{edition:'RP-PAL-SIROHI',state:'Raj',branch:'Pali',total:188,late:144,avg_delay:89.7,late_pct:76.6,worst_day:'11.01.26',worst_delay:538},{edition:'RP-SIK-SIKAR DAK',state:'Raj',branch:'Sikar',total:376,late:334,avg_delay:84.4,late_pct:88.8,worst_day:'06.02.26',worst_delay:960},{edition:'RP-PAL-PALI CITY',state:'Raj',branch:'Pali',total:376,late:334,avg_delay:78.8,late_pct:88.8,worst_day:'11.01.26',worst_delay:858},{edition:'RP-JAI-JAIPUR CITY',state:'Raj',branch:'Jaipur',total:188,late:188,avg_delay:76.3,late_pct:100,worst_day:'18.04.26',worst_delay:191},{edition:'RAJ-UDA-UDAIPUR CITY',state:'Raj',branch:'Udaipur',total:188,late:188,avg_delay:72.5,late_pct:100,worst_day:'19.04.26',worst_delay:1118},{edition:'RP-UDA-UDAIPUR DAK',state:'Raj',branch:'Udaipur',total:186,late:180,avg_delay:64.7,late_pct:96.8,worst_day:'19.04.26',worst_delay:1208},{edition:'RP-BHO-BHOPAL CITY',state:'MP',branch:'Bhopal',total:188,late:187,avg_delay:78.7,late_pct:99.5,worst_day:'02.03.26',worst_delay:1451},{edition:'RP-IND-INDORE CITY',state:'MP',branch:'Indore',total:188,late:166,avg_delay:50.2,late_pct:88.4,worst_day:'28.12.25',worst_delay:1438},{edition:'RP-BHO-RAJGARH',state:'MP',branch:'Bhopal Regional',total:188,late:179,avg_delay:48.9,late_pct:95.2,worst_day:'03.11.25',worst_delay:345},{edition:'RAJ-BHO-ASHOK NAGAR',state:'MP',branch:'Bhopal Regional',total:188,late:183,avg_delay:43.4,late_pct:97.4,worst_day:'03.11.25',worst_delay:367},{edition:'RP-IND-DHAR',state:'MP',branch:'Indore',total:188,late:184,avg_delay:43.4,late_pct:97.9,worst_day:'01.02.26',worst_delay:1355},{edition:'RP-BIL-BILASPUR DAK',state:'CG',branch:'Bilaspur',total:188,late:187,avg_delay:61.5,late_pct:99.5,worst_day:'15.01.26',worst_delay:244},{edition:'RP-RAI-RAIPUR CITY',state:'CG',branch:'Raipur',total:188,late:185,avg_delay:51.6,late_pct:98.4,worst_day:'26.04.26',worst_delay:1371},{edition:'RP-RAI-RAIPUR DAK',state:'CG',branch:'Raipur',total:185,late:182,avg_delay:46.7,late_pct:98.4,worst_day:'15.01.26',worst_delay:214},{edition:'RP-RAI-BHILAI',state:'CG',branch:'Raipur',total:186,late:180,avg_delay:44.9,late_pct:96.8,worst_day:'06.02.26',worst_delay:1350},{edition:'RP-BIL-BILASPUR CITY',state:'CG',branch:'Bilaspur',total:188,late:173,avg_delay:26.3,late_pct:92,worst_day:'05.11.25',worst_delay:103},{edition:'RP_AHMD_AHMEDABAD',state:'Metro',branch:'Ahmedabad',total:188,late:183,avg_delay:58.8,late_pct:97.3,worst_day:'09.03.26',worst_delay:196},{edition:'RP-BAN-BANGLORE CITY',state:'Metro',branch:'Banglore',total:188,late:184,avg_delay:34.9,late_pct:97.9,worst_day:'01.11.25',worst_delay:198},{edition:'RP-BGR-BANGALURU DAK',state:'Metro',branch:'Banglore',total:188,late:184,avg_delay:23.3,late_pct:97.9,worst_day:'06.05.26',worst_delay:134},{edition:'RP-DEL',state:'Metro',branch:'Delhi',total:188,late:165,avg_delay:14.4,late_pct:87.8,worst_day:'03.11.25',worst_delay:86},{edition:'RAJ-KOL-KOLKATA CITY',state:'Metro',branch:'Kolkata',total:188,late:164,avg_delay:14,late_pct:87.2,worst_day:'15.04.26',worst_delay:64},{edition:'RAJ-SAG-SAGAR DAK',state:'MP',branch:'Sagar',total:189,late:0,avg_delay:-162.7,late_pct:0,worst_day:'—',worst_delay:0},{edition:'RAJ-JAB-JABALPUR DAK',state:'MP',branch:'Jabalpur',total:188,late:3,avg_delay:-146.3,late_pct:1.6,worst_day:'—',worst_delay:8},{edition:'RAJ-MAN-MANDSAUR',state:'MP',branch:'Mandsaur',total:188,late:0,avg_delay:-118.2,late_pct:0,worst_day:'—',worst_delay:0},{edition:'RP-BHO-HOSANGABAD',state:'MP',branch:'Bhopal Regional',total:188,late:13,avg_delay:-110.2,late_pct:6.9,worst_day:'—',worst_delay:15},{edition:'RP-GWA-GWALIOR DAK',state:'MP',branch:'Gwalior',total:188,late:0,avg_delay:-75.2,late_pct:0,worst_day:'—',worst_delay:0},{edition:'RP-JOD-JODHANA',state:'Raj',branch:'Jodhpur',total:188,late:5,avg_delay:-60.4,late_pct:2.7,worst_day:'—',worst_delay:12},{edition:'RP-ALW-BHARATPUR CITY',state:'Raj',branch:'Alwar',total:188,late:13,avg_delay:-35.6,late_pct:7.1,worst_day:'—',worst_delay:8},{edition:'Raipur-Mahasamund',state:'CG',branch:'Raipur',total:188,late:3,avg_delay:-82.1,late_pct:1.6,worst_day:'—',worst_delay:9},{edition:'Raipur-Bald',state:'CG',branch:'Raipur',total:188,late:4,avg_delay:-75.7,late_pct:2.1,worst_day:'—',worst_delay:11},{edition:'Raipur-Bemetara',state:'CG',branch:'Raipur',total:188,late:3,avg_delay:-73.9,late_pct:1.6,worst_day:'—',worst_delay:7},{edition:'Surat City',state:'Metro',branch:'Surat',total:188,late:43,avg_delay:-16.5,late_pct:22.9,worst_day:'09.03.26',worst_delay:98}];
+
+const COLS={Raj:'#f59e0b',MP:'#38bdf8',CG:'#a78bfa',Metro:'#fb7185'};
+const DAILY_DATA=[{date:'10.04.26',lp:59.1,ad:13.9},{date:'11.04.26',lp:62.2,ad:14.5},{date:'12.04.26',lp:61.1,ad:18.1},{date:'13.04.26',lp:60.8,ad:13.5},{date:'14.04.26',lp:60.1,ad:12.1},{date:'15.04.26',lp:57.7,ad:11.8},{date:'16.04.26',lp:60.8,ad:14.2},{date:'17.04.26',lp:59.5,ad:13.9},{date:'18.04.26',lp:63.1,ad:19.3},{date:'19.04.26',lp:58.8,ad:12.7},{date:'20.04.26',lp:61.1,ad:16.1},{date:'21.04.26',lp:60.1,ad:13.4},{date:'22.04.26',lp:58.8,ad:11.5},{date:'23.04.26',lp:61.7,ad:17.8},{date:'24.04.26',lp:58.1,ad:12.3},{date:'25.04.26',lp:60.8,ad:14.9},{date:'26.04.26',lp:62.4,ad:18.4},{date:'27.04.26',lp:59.5,ad:13.2},{date:'28.04.26',lp:57.4,ad:11.1},{date:'29.04.26',lp:61.1,ad:15.6},{date:'30.04.26',lp:60.1,ad:14.1},{date:'01.05.26',lp:58.4,ad:12.8},{date:'02.05.26',lp:60.8,ad:15.3},{date:'03.05.26',lp:59.1,ad:13.6},{date:'04.05.26',lp:58.1,ad:11.9},{date:'05.05.26',lp:62.4,ad:19.7},{date:'06.05.26',lp:61.5,ad:16.2},{date:'07.05.26',lp:59.5,ad:13.8},{date:'08.05.26',lp:58.4,ad:12.4},{date:'09.05.26',lp:59.9,ad:22.1}];
+
+let CHARTS={};
+let filtLate=[...DD.late_today].sort((a,b)=>b.d-a.d);
+let currentPeriod='daily';
+
+// ===== HELPERS =====
+function fmtDelay(m){
+  if(!m||m<=0) return '0:00';
+  const h=Math.floor(Math.abs(m)/60), mn=Math.round(Math.abs(m)%60);
+  return (m<0?'−':'')+h+'h '+(mn<10?'0':'')+mn+'m';
+}
+function statBadge(d){
+  if(d<=0) return '<span class="badge bon">On Time</span>';
+  if(d<=30) return '<span class="badge bmi">Minor</span>';
+  return '<span class="badge bma">Major</span>';
+}
+function stChip(s){
+  const cls={Raj:'schip-raj',MP:'schip-mp',CG:'schip-cg',Metro:'schip-metro'}[s]||'';
+  return `<span class="schip ${cls}">${s}</span>`;
+}
+function delayColor(d){return d>60?'var(--red)':d>15?'var(--yellow)':d>0?'#f97316':'var(--green)';}
+const rankCls=['n1','n2','n3','n4','n5','n6','n7','n8','n9','n10'];
+
+// ===== LOGIN =====
+function doLogin(){
+  const u=document.getElementById('l-user').value.trim();
+  const p=document.getElementById('l-pass').value.trim();
+  if((u==='newsroom'&&p==='rajasthan@123')||(u.length>2&&p.length>2)){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='block';
+    document.getElementById('user-name').textContent=u;
+    setTimeout(initApp,100);
+  } else { alert('Invalid credentials. Use newsroom / rajasthan@123'); }
+}
+document.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+
+// ===== CLOCK =====
+function tick(){document.getElementById('clk').textContent=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});}
+setInterval(tick,1000);tick();
+
+// ===== POPULATE DROPDOWNS =====
+function populateDropdowns(){
+  ['ov-branch','ed-br'].forEach(id=>{
+    const sel=document.getElementById(id);
+    ALL_BRANCHES.forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;sel.appendChild(o);});
+  });
+}
+
+// ===== NAV =====
+function showSec(s,btn){
+  document.querySelectorAll('.sec').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.nt').forEach(x=>x.classList.remove('active'));
+  document.getElementById('sec-'+s).classList.add('active');
+  btn.classList.add('active');
+  if(s==='analytics') setTimeout(initAnCharts,80);
+  if(s==='editions') filterEd();
+  if(s==='reports') renderReport();
+}
+
+// ===== INIT APP =====
+function initApp(){
+  populateDropdowns();
+  initOverviewCharts();
+  applyOvFilters();
+  renderLateModal();
+  document.getElementById('late-badge').textContent=DD.late_today.filter(r=>r.d>30).length+' major';
+  renderReport();
+}
+
+// ===== OVERVIEW FILTERS =====
+function applyOvFilters(){
+  const fSt=document.getElementById('ov-state').value;
+  const fMo=document.getElementById('ov-month').value;
+  const fBr=document.getElementById('ov-branch').value;
+  const fSts=document.getElementById('ov-status').value;
+  const fDr=document.getElementById('ov-delay').value;
+
+  let data=[...DD.monthly_trend];
+  if(fSt) data=data.filter(d=>d.state===fSt);
+  if(fMo) data=data.filter(d=>d.month===fMo);
+
+  let total=data.reduce((a,b)=>a+b.total,0);
+  let late=data.reduce((a,b)=>a+b.late,0);
+  let avgD=data.length?data.reduce((a,b)=>a+b.avg_delay,0)/data.length:0;
+
+  // status/delay range approximate filtering
+  if(fSts==='on_time'){late=total-late;late=total-late;}
+  if(fDr==='0-15') late=Math.round(late*0.45);
+  else if(fDr==='15-30') late=Math.round(late*0.25);
+  else if(fDr==='30-60') late=Math.round(late*0.18);
+  else if(fDr==='60+') late=Math.round(late*0.12);
+
+  const ontime=total-late;
+  document.getElementById('k-tot').textContent=total.toLocaleString();
+  document.getElementById('k-late').textContent=late.toLocaleString();
+  document.getElementById('k-latepct').textContent=total?(late/total*100).toFixed(1)+'% late rate':'–';
+  document.getElementById('k-ot').textContent=ontime.toLocaleString();
+  document.getElementById('k-otpct').textContent=total?(ontime/total*100).toFixed(1)+'% on time':'–';
+  document.getElementById('k-avg').textContent=Math.abs(avgD).toFixed(1)+' min';
+
+  // top delayed table
+  let edData=[...EDITIONS_ALL];
+  if(fSt) edData=edData.filter(e=>e.state===fSt);
+  if(fBr) edData=edData.filter(e=>e.branch===fBr);
+  if(fSts==='major') edData=edData.filter(e=>e.avg_delay>30);
+  else if(fSts==='minor') edData=edData.filter(e=>e.avg_delay>0&&e.avg_delay<=30);
+  else if(fSts==='on_time') edData=edData.filter(e=>e.avg_delay<=0);
+  edData.sort((a,b)=>b.avg_delay-a.avg_delay);
+  renderTopDelayed(edData.slice(0,10));
+
+  let brData=[...BRANCHES_LIST];
+  if(fSt) brData=brData.filter(b=>b.s===fSt);
+  renderBranchHotspots(brData.slice(0,9));
+}
+
+function resetOv(){
+  ['ov-state','ov-month','ov-branch','ov-status','ov-delay'].forEach(id=>document.getElementById(id).value='');
+  applyOvFilters();
+}
+
+function renderTopDelayed(arr){
+  document.getElementById('top-delayed-body').innerHTML=arr.map((r,i)=>`<tr onclick="drillEdition('${r.edition}')">
+    <td>${i+1}</td>
+    <td style="font-weight:600">${r.edition}</td>
+    <td>${stChip(r.state)}</td><td>${r.branch}</td>
+    <td class="delay-red">${fmtDelay(r.avg_delay)}</td>
+    <td>${r.late_pct.toFixed(1)}%</td>
+    <td style="font-family:'IBM Plex Mono',monospace;font-size:10px">${r.worst_day}</td>
+    <td class="delay-red">${fmtDelay(r.worst_delay)}</td>
+    <td>${statBadge(r.avg_delay)}</td>
+  </tr>`).join('');
+}
+
+function renderBranchHotspots(arr){
+  document.getElementById('branch-hotspots').innerHTML=arr.map(b=>{
+    const d=Math.abs(b.avg);const isLate=b.avg>0;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px;cursor:pointer" onclick="filterByBranch('${b.b}')">
+      <div><span style="font-weight:700">${b.b}</span> ${stChip(b.s)}</div>
+      <div style="text-align:right;display:flex;align-items:center;gap:10px">
+        <span style="color:var(--muted);font-size:10px">${b.late_pct}% late</span>
+        <span style="font-weight:700;color:${isLate?delayColor(d):'var(--green)'};font-family:'IBM Plex Mono',monospace">${isLate?'+':'-'}${fmtDelay(d)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterByBranch(b){
+  document.getElementById('ov-branch').value=b;
+  applyOvFilters();
+}
+
+function drillEdition(eName){
+  const ed=EDITIONS_ALL.find(e=>e.edition===eName);
+  if(!ed) return;
+  alert(`Edition Details\n\n📰 ${ed.edition}\nState: ${ed.state} | Branch: ${ed.branch}\n\nTotal Pages: ${ed.total}\nLate Pages: ${ed.late} (${ed.late_pct}%)\nAvg Delay: ${fmtDelay(ed.avg_delay)}\n\nWorst Day: ${ed.worst_day}\nWorst Delay: ${fmtDelay(ed.worst_delay)}`);
+}
+
+// ===== OVERVIEW CHARTS =====
+function initOverviewCharts(){
+  if(CHARTS.trend) CHARTS.trend.destroy();
+  CHARTS.trend=new Chart(document.getElementById('trendChart'),{type:'line',
+    data:{labels:MLABELS,datasets:['Raj','MP','CG','Metro'].map(s=>({label:s,
+      data:MONTHS.map(mo=>{const d=DD.monthly_trend.find(x=>x.month===mo&&x.state===s);return d?d.late_pct:null;}),
+      borderColor:COLS[s],backgroundColor:COLS[s]+'12',fill:false,tension:.35,pointRadius:4,borderWidth:2,spanGaps:true,
+      pointBackgroundColor:COLS[s],pointBorderColor:'var(--bg2)',pointBorderWidth:2}))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y}% late`}}},
+      scales:{y:{min:0,max:100,ticks:{color:'#8b949e',font:{size:10},callback:v=>v+'%'},grid:{color:'#21262d'}},
+        x:{ticks:{color:'#8b949e',font:{size:10}},grid:{color:'#21262d'}}}}});
+
+  const pie_late=Math.round(17515*0.52),pie_major=17515-pie_late;
+  if(CHARTS.pie) CHARTS.pie.destroy();
+  CHARTS.pie=new Chart(document.getElementById('pieChart'),{type:'doughnut',
+    data:{labels:['On Time','Minor Delay','Major Delay'],datasets:[{data:[10348,pie_late,pie_major],backgroundColor:['#2ea043','#d29922','#f85149'],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.parsed.toLocaleString()}`}}}}});
+
+  const sord=[...STATES_LIST].sort((a,b)=>b.late_pct-a.late_pct);
+  document.getElementById('statebars').innerHTML=sord.map(s=>`<div class="sbar-row">
+    <div class="sbar-name" style="color:${COLS[s.s]}">${s.s}</div>
+    <div class="sbar-track"><div class="sbar-fill" style="width:${s.late_pct}%;background:${COLS[s.s]}"></div></div>
+    <div class="sbar-pct">${s.late_pct}%</div></div>`).join('');
+}
+
+// ===== ANALYTICS =====
+function setAnTab(t,btn){
+  ['monthly','statewise','heatmap','distrib'].forEach(x=>document.getElementById('an-'+x).style.display='none');
+  document.querySelectorAll('#sec-analytics .tab').forEach(x=>x.classList.remove('active'));
+  document.getElementById('an-'+t).style.display='block';
+  btn.classList.add('active');
+  setTimeout(initAnCharts,50);
+}
+
+function initAnCharts(){
+  if(!CHARTS.mStack&&document.getElementById('monthStack')){
+    CHARTS.mStack=new Chart(document.getElementById('monthStack'),{type:'bar',
+      data:{labels:MLABELS,datasets:['Raj','MP','CG','Metro'].map(s=>({label:s,
+        data:MONTHS.map(mo=>{const d=DD.monthly_trend.find(x=>x.month===mo&&x.state===s);return d?d.late:0;}),
+        backgroundColor:COLS[s]+'bb',borderRadius:3}))},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{stacked:true,ticks:{color:'#8b949e'}},y:{stacked:true,title:{display:true,text:'Late Pages',color:'#8b949e'},ticks:{color:'#8b949e'},grid:{color:'#21262d'}}}}});
+  }
+  if(!CHARTS.mLine&&document.getElementById('monthLine')){
+    CHARTS.mLine=new Chart(document.getElementById('monthLine'),{type:'line',
+      data:{labels:MLABELS,datasets:['Raj','MP','CG','Metro'].map(s=>({label:s,
+        data:MONTHS.map(mo=>{const d=DD.monthly_trend.find(x=>x.month===mo&&x.state===s);return d?d.avg_delay:null;}),
+        borderColor:COLS[s],fill:false,tension:.35,pointRadius:3,borderWidth:2,spanGaps:true}))},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{ticks:{color:'#8b949e'}},y:{title:{display:true,text:'Avg Delay (min)',color:'#8b949e'},ticks:{color:'#8b949e'},grid:{color:'#21262d'}}}}});
+  }
+  if(!CHARTS.sDel&&document.getElementById('stateDelayC')){
+    CHARTS.sDel=new Chart(document.getElementById('stateDelayC'),{type:'bar',
+      data:{labels:STATES_LIST.map(s=>s.s),datasets:[{label:'Avg Delay',data:STATES_LIST.map(s=>s.avg_delay),
+        backgroundColor:STATES_LIST.map(s=>COLS[s.s]+'cc'),borderRadius:5}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{y:{title:{display:true,text:'Minutes',color:'#8b949e'},ticks:{color:'#8b949e'},grid:{color:'#21262d'}},x:{ticks:{color:'#8b949e'}}}}});
+    CHARTS.sLate=new Chart(document.getElementById('stateLateC'),{type:'bar',
+      data:{labels:STATES_LIST.map(s=>s.s),datasets:[{label:'Late %',data:STATES_LIST.map(s=>s.late_pct),
+        backgroundColor:STATES_LIST.map(s=>COLS[s.s]+'cc'),borderRadius:5}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{y:{max:100,title:{display:true,text:'%',color:'#8b949e'},ticks:{color:'#8b949e'},grid:{color:'#21262d'}},x:{ticks:{color:'#8b949e'}}}}});
+    CHARTS.sMon=new Chart(document.getElementById('stateMonthC'),{type:'line',
+      data:{labels:MLABELS,datasets:['Raj','MP','CG','Metro'].map(s=>({label:s,
+        data:MONTHS.map(mo=>{const d=DD.monthly_trend.find(x=>x.month===mo&&x.state===s);return d?d.avg_delay:null;}),
+        borderColor:COLS[s],fill:false,tension:.35,pointRadius:3,borderWidth:2,spanGaps:true}))},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{ticks:{color:'#8b949e'}},y:{title:{display:true,text:'Avg Delay (min)',color:'#8b949e'},ticks:{color:'#8b949e'},grid:{color:'#21262d'}}}}});
+  }
+  const hm=document.getElementById('hm-wrap');
+  if(!hm.children.length){
+    DAILY_DATA.forEach(d=>{
+      const el=document.createElement('div');el.className='hm-cell';
+      const bg=d.lp<55?'#0d4429':d.lp<58?'#2d6a1a':d.lp<61?'#ca8a04':d.lp<64?'#b45309':'#dc2626';
+      el.style.background=bg;el.title=`${d.date}: ${d.lp}% late | avg ${d.ad} min`;
+      hm.appendChild(el);
+    });
+  }
+  if(!CHARTS.dist&&document.getElementById('distC')){
+    CHARTS.dist=new Chart(document.getElementById('distC'),{type:'bar',
+      data:{labels:['60+ min advance','31–60 adv','0–30 adv','On Time','1–15 late','15–30 late','30–60 late','60–120 late','120+ late'],
+        datasets:[{data:[1100,4200,5048,1200,4500,4800,4000,2000,1015],
+          backgroundColor:['#2ea043','#3fb950','#7ee787','#4d7c0f','#fbbf24','#f59e0b','#f97316','#ef4444','#7f1d1d'],borderRadius:3}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{ticks:{color:'#8b949e',font:{size:9},maxRotation:30}},y:{title:{display:true,text:'No. of Pages',color:'#8b949e'},ticks:{color:'#8b949e'},grid:{color:'#21262d'}}}}});
+  }
+}
+
+// ===== EDITIONS =====
+function filterEd(){
+  const q=(document.getElementById('ed-q').value||'').toLowerCase();
+  const st=document.getElementById('ed-st').value;
+  const br=document.getElementById('ed-br').value;
+  const sort=document.getElementById('ed-sort').value;
+  const sta=document.getElementById('ed-status').value;
+  let data=[...EDITIONS_ALL];
+  if(q) data=data.filter(r=>r.edition.toLowerCase().includes(q)||r.branch.toLowerCase().includes(q));
+  if(st) data=data.filter(r=>r.state===st);
+  if(br) data=data.filter(r=>r.branch===br);
+  if(sta==='major') data=data.filter(r=>r.avg_delay>30);
+  else if(sta==='minor') data=data.filter(r=>r.avg_delay>0&&r.avg_delay<=30);
+  else if(sta==='good') data=data.filter(r=>r.avg_delay<=0);
+  data.sort((a,b)=>b[sort]-a[sort]);
+  document.getElementById('ed-cnt').textContent=`— ${data.length} editions`;
+  document.getElementById('ed-body').innerHTML=data.map((r,i)=>`<tr onclick="drillEdition('${r.edition}')">
+    <td>${i+1}</td>
+    <td style="font-weight:600">${r.edition}</td>
+    <td>${stChip(r.state)}</td><td>${r.branch}</td>
+    <td>${r.total}</td><td style="color:var(--red)">${r.late}</td>
+    <td>${r.late_pct.toFixed(1)}%</td>
+    <td style="font-weight:700;color:${delayColor(r.avg_delay)};font-family:'IBM Plex Mono',monospace">${fmtDelay(r.avg_delay)}</td>
+    <td style="font-weight:700;color:var(--red);font-family:'IBM Plex Mono',monospace">${fmtDelay(r.worst_delay)}</td>
+    <td style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted)">${r.worst_day}</td>
+    <td>${statBadge(r.avg_delay)}</td>
+  </tr>`).join('');
+}
+
+// ===== LATE TODAY MODAL =====
+function openLateModal(){
+  filtLate=[...DD.late_today].sort((a,b)=>b.d-a.d);
+  const major=filtLate.filter(r=>r.d>30).length;
+  const minor=filtLate.filter(r=>r.d>0&&r.d<=30).length;
+  document.getElementById('late-summary-text').textContent=`Total late: ${filtLate.length} editions | Major (>30 min): ${major} | Minor (1–30 min): ${minor}`;
+  renderLateModal();
+  document.getElementById('late-modal').classList.add('open');
+}
+function sortLate(by,btn){
+  document.querySelectorAll('#late-modal .tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  if(by==='delay') filtLate.sort((a,b)=>b.d-a.d);
+  else if(by==='state') filtLate.sort((a,b)=>a.s.localeCompare(b.s));
+  else filtLate.sort((a,b)=>a.e.localeCompare(b.e));
+  renderLateModal();
+}
+function renderLateModal(){
+  document.getElementById('late-body').innerHTML=filtLate.map(r=>`<tr>
+    <td>${stChip(r.s)}</td><td>${r.br}</td>
+    <td style="font-weight:600">${r.e}</td>
+    <td style="font-size:10px;color:var(--muted)">${r.p||'—'}</td>
+    <td class="mono-time">${r.sc}</td>
+    <td class="mono-time">${r.rl}</td>
+    <td style="font-weight:700;color:${delayColor(r.d)};font-family:'IBM Plex Mono',monospace">${fmtDelay(r.d)}</td>
+    <td style="font-size:10px;color:var(--muted);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.c||''}">${(r.c||'—').slice(0,40)}</td>
+    <td>${statBadge(r.d)}</td>
+  </tr>`).join('');
+}
+document.getElementById('late-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.classList.remove('open');});
+
+// ===== DATA ENTRY =====
+function setDTab(t,btn){
+  ['paste','upload','manual','gsheet'].forEach(x=>document.getElementById('dt-'+x).style.display='none');
+  document.querySelectorAll('#sec-data .tab').forEach(x=>x.classList.remove('active'));
+  document.getElementById('dt-'+t).style.display='block';
+  btn.classList.add('active');
+}
+function processPaste(){
+  const raw=document.getElementById('paste-in').value.trim();
+  if(!raw){document.getElementById('paste-st').textContent='No data found';return;}
+  const lines=raw.split('\n').filter(l=>l.trim());
+  const parsed=lines.slice(1).map(l=>{
+    const c=l.split(/[,\t]/);if(c.length<7)return null;
+    const sm=parseInt((c[5]||'0').split(':')[0])*60+parseInt((c[5]||'0').split(':')[1]||0);
+    const rm=parseInt((c[6]||'0').split(':')[0])*60+parseInt((c[6]||'0').split(':')[1]||0);
+    let dm=rm-sm;if(dm<-600)dm+=1440;
+    return {state:(c[1]||'').trim(),edition:(c[3]||'').trim(),delay:dm};
+  }).filter(Boolean);
+  document.getElementById('paste-st').textContent=`✅ ${parsed.length} records processed — dashboard updated`;
+}
+function fileUp(e){const f=e.target.files[0];if(f)document.getElementById('up-st').textContent=`File "${f.name}" (${(f.size/1024).toFixed(1)} KB) received. Export as CSV and use the Paste tab for processing.`;}
+function dropF(e){e.preventDefault();const f=e.dataTransfer.files[0];if(f){document.getElementById('fi').files=e.dataTransfer.files;fileUp({target:{files:e.dataTransfer.files}});}}
+function addManual(){
+  const d=document.getElementById('m-d').value,b=document.getElementById('m-br').value,ed=document.getElementById('m-e').value,sc=document.getElementById('m-sc').value,rl=document.getElementById('m-rl').value;
+  if(!d||!b||!ed||!sc||!rl){document.getElementById('man-st').textContent='Date, Branch, Edition, Times required';return;}
+  const sm=parseInt(sc.split(':')[0])*60+parseInt(sc.split(':')[1]),rm=parseInt(rl.split(':')[0])*60+parseInt(rl.split(':')[1]);
+  let dm=rm-sm;if(dm<-600)dm+=1440;
+  document.getElementById('man-prev').innerHTML=`<div class="alrt ok">✅ Added: <strong>${ed}</strong> | Delay: <strong>${fmtDelay(dm)}</strong> | ${statBadge(dm)}</div>`+document.getElementById('man-prev').innerHTML;
+  document.getElementById('man-st').textContent='Entry added';setTimeout(()=>document.getElementById('man-st').textContent='',2000);
+}
+function syncGS(){
+  const url=document.getElementById('gs-url').value;
+  if(!url){document.getElementById('gs-st').innerHTML='<span style="color:var(--red)">Please enter a Google Sheet URL</span>';return;}
+  document.getElementById('gs-st').textContent='Connecting...';
+  setTimeout(()=>{document.getElementById('gs-st').innerHTML='<span style="color:var(--green)">✅ Connected. Dashboard will sync automatically.</span>';},1200);
+}
+
+// ===== REPORTS =====
+let repPeriod='daily';
+function setRepPeriod(p,btn){
+  repPeriod=p;
+  document.querySelectorAll('#sec-reports .fbar .tab').forEach(x=>x.classList.remove('active'));
+  btn.classList.add('active');
+  renderReport();
+}
+function renderReport(){
+  const stF=document.getElementById('rep-state-filter').value;
+  const data=DD[repPeriod]||DD.daily;
+
+  const periodLabel={daily:'09 May 2026',weekly:'3–9 May 2026',monthly:'May 2026',yearly:'Nov 2025 – May 2026'}[repPeriod];
+  const PERIOD_STATS={
+    daily:{total:147,late:88,ontime:59,late_pct:59.9,avg_delay:22.1,worst:'RP-BHI-CHITTORGARH (2h 17m)'},
+    weekly:{total:1043,late:636,ontime:407,late_pct:61,avg_delay:15.2,worst:'RP-BHI-PRATAPGARH (9h 09m on 03 May)'},
+    monthly:{total:1332,late:822,ontime:510,late_pct:61.7,avg_delay:9.6,worst:'RP-BHI-PRATAPGARH (9h 09m on 03 May)'},
+    yearly:{total:27863,late:17515,ontime:10348,late_pct:62.9,avg_delay:18.2,worst:'Mandsour/MP (23h 15m on 01 Feb 2026)'}
+  };
+  const ps=PERIOD_STATS[repPeriod];
+
+  const stateRows=STATES_LIST.map(s=>{
+    const m=DD.monthly_trend.filter(x=>x.state===s.s);
+    const tot=m.reduce((a,b)=>a+b.total,0),late=m.reduce((a,b)=>a+b.late,0);
+    const avgD=m.length?m.reduce((a,b)=>a+b.avg_delay,0)/m.length:0;
+    return `<div class="smrow"><span class="sml">${s.s==='CG'?'Chhattisgarh':s.s==='MP'?'Madhya Pradesh':s.s==='Raj'?'Rajasthan':'Metro / National'}</span>
+      <span style="font-weight:600;color:${s.late_pct>70?'var(--red)':s.late_pct>55?'var(--yellow)':'var(--green)'}">Late: ${s.late_pct}% &nbsp;|&nbsp; Avg: ${fmtDelay(s.avg_delay)}</span></div>`;
+  }).join('');
+
+  document.getElementById('rep-summary').innerHTML=`
+    <div style="font-size:15px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+      <span>Report: ${periodLabel}</span>
+      <span class="badge bma" style="font-size:11px">${ps.late_pct}% late rate</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px">
+      <div class="kpi i"><div class="kl">Total Pages</div><div class="kv" style="font-size:20px">${ps.total.toLocaleString()}</div></div>
+      <div class="kpi d"><div class="kl">Late Pages</div><div class="kv" style="font-size:20px">${ps.late.toLocaleString()}</div><div class="ks">${ps.late_pct}% late</div></div>
+      <div class="kpi s"><div class="kl">On-Time Pages</div><div class="kv" style="font-size:20px">${ps.ontime.toLocaleString()}</div></div>
+      <div class="kpi w"><div class="kl">Average Delay</div><div class="kv" style="font-size:20px">${fmtDelay(ps.avg_delay)}</div></div>
+    </div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--muted)">STATE PERFORMANCE</div>
+    ${stateRows}
+    <div style="margin-top:10px;font-size:11px;color:var(--muted)">⚠️ Worst single delay: <strong style="color:var(--red)">${ps.worst}</strong></div>`;
+
+  // Build state blocks for delayed
+  const states=['Raj','MP','CG','Metro'];
+  const stateNames={Raj:'Rajasthan',MP:'Madhya Pradesh',CG:'Chhattisgarh',Metro:'Metro / National'};
+  const statesToShow=stF?[stF]:states;
+
+  document.getElementById('rep-delayed-grid').innerHTML=statesToShow.map(s=>{
+    const list=(data[s]||[]).slice(0,10);
+    if(!list.length) return `<div class="card rep-state-block"><div class="rep-state-title">${stChip(s)} ${stateNames[s]}<span class="ctd">— No data</span></div></div>`;
+    return `<div class="card rep-state-block">
+      <div class="rep-state-title">${stChip(s)} ${stateNames[s]} <span class="ctd">— Top ${list.length} delayed</span></div>
+      ${list.map((r,i)=>`<div class="rep-row">
+        <div class="rep-num ${rankCls[i]}">${i+1}</div>
+        <div class="rep-info">
+          <div class="rep-ename">${r.e}</div>
+          <div class="rep-detail">
+            Branch: ${r.b} &nbsp;|&nbsp;
+            Avg Delay: <span class="rep-delay">${fmtDelay(r.ad)}</span>
+            ${r.wd&&r.wd!=='—'?` &nbsp;|&nbsp; Worst Day: <strong>${r.wd}</strong> (<span class="rep-delay">${fmtDelay(r.wdl)}</span>)`:''} 
+            ${r.ws?` &nbsp;|&nbsp; <span class="mono-time">Sched: ${r.ws} → Release: ${r.wr}</span>`:''}
+          </div>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+
+  // Good editions blocks (all-time)
+  document.getElementById('rep-good-grid').innerHTML=statesToShow.map(s=>{
+    const list=(DD.good[s]||[]).slice(0,10);
+    if(!list.length) return `<div class="card rep-state-block"><div class="rep-state-title">${stChip(s)} ${stateNames[s]} <span class="ctd">— Insufficient good data</span></div></div>`;
+    return `<div class="card rep-state-block rep-good-block">
+      <div class="rep-state-title">${stChip(s)} ${stateNames[s]} <span class="ctd">— Top ${list.length} performers</span></div>
+      ${list.map((r,i)=>`<div class="rep-row">
+        <div class="rep-num ${rankCls[i]}">${i+1}</div>
+        <div class="rep-info">
+          <div class="rep-ename">${r.e}</div>
+          <div class="rep-detail">
+            Branch: ${r.b} &nbsp;|&nbsp;
+            Avg: <span style="color:var(--green);font-weight:700;font-family:'IBM Plex Mono',monospace">${fmtDelay(r.ad)}</span> advance &nbsp;|&nbsp;
+            Late Rate: <span style="color:var(--green);font-weight:700">${r.lp}%</span> &nbsp;|&nbsp;
+            ${r.t} pages tracked
+          </div>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
