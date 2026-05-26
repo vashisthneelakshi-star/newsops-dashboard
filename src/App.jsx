@@ -170,8 +170,30 @@ export default function App() {
     return Object.values(m).sort((a, b) => b.late - a.late);
   }, [base]);
 
-  const top10late  = useMemo(() => [...base].filter(r => r.dm > 0).sort((a, b) => b.dm - a.dm).slice(0, 10), [base]);
-  const top10early = useMemo(() => [...base].sort((a, b) => a.dm - b.dm).slice(0, 10), [base]);
+  // Group by state+branch+edition → average delay, count, most common cause
+  const groupedTop10 = useMemo(() => {
+    const map = {};
+    base.forEach(r => {
+      const key = `${r.state}||${r.branch}||${r.edition}`;
+      if (!map[key]) map[key] = { state: r.state, branch: r.branch, edition: r.edition, pullout: r.pullout, totalDm: 0, count: 0, causes: {} };
+      map[key].totalDm += r.dm;
+      map[key].count += 1;
+      if (r.cause) map[key].causes[r.cause] = (map[key].causes[r.cause] || 0) + 1;
+    });
+    return Object.values(map).map(g => ({
+      ...g,
+      avgDm: Math.round(g.totalDm / g.count),
+      topCause: Object.entries(g.causes).sort((a,b) => b[1]-a[1])[0]?.[0] || "",
+    }));
+  }, [base]);
+
+  const top10late  = useMemo(() =>
+    [...groupedTop10].filter(r => r.avgDm > 0).sort((a, b) => b.avgDm - a.avgDm).slice(0, 10),
+  [groupedTop10]);
+
+  const top10early = useMemo(() =>
+    [...groupedTop10].filter(r => r.avgDm < 0).sort((a, b) => a.avgDm - b.avgDm).slice(0, 10),
+  [groupedTop10]);
 
   const causes = useMemo(() => {
     const m = {};
@@ -476,9 +498,10 @@ export default function App() {
                       <span style={{ fontSize: 11, fontWeight: 500, color: "#a32d2d", minWidth: 20, textAlign: "right" }}>#{i+1}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.branch} — {r.edition}</div>
-                        <div style={{ fontSize: 11, color: "#888" }}>{r.state}{r.cause ? " · " + r.cause : ""}</div>
+                        <div style={{ fontSize: 11, color: "#888" }}>{r.state}{r.topCause ? " · " + r.topCause : ""}</div>
+                        <div style={{ fontSize: 10, color: "#bbb" }}>{r.count} din · avg delay</div>
                       </div>
-                      <span style={{ fontSize: 10, background: "#fff0f0", color: "#a32d2d", padding: "2px 8px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>+{r.dm}m</span>
+                      <span style={{ fontSize: 10, background: "#fff0f0", color: "#a32d2d", padding: "2px 8px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>+{r.avgDm}m avg</span>
                     </div>
                   ))}
                 </div>
@@ -486,17 +509,18 @@ export default function App() {
                   <div style={{ fontSize: 13, fontWeight: 500, color: "#3b6d11", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
                     <i className="ti ti-award" aria-hidden="true" style={{ fontSize: 15 }}></i> Top 10 Early / On-Time
                   </div>
-                  {top10early.length === 0 && <div style={{ fontSize: 12, color: "#aaa" }}>No data</div>}
+                  {top10early.length === 0 && <div style={{ fontSize: 12, color: "#aaa" }}>No early editions in this selection</div>}
                   {top10early.map((r, i) => {
-                    const d = fmtD(r.dm);
+                    const d = fmtD(r.avgDm);
                     return (
                       <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
                         <span style={{ fontSize: 11, fontWeight: 500, color: "#3b6d11", minWidth: 20, textAlign: "right" }}>#{i+1}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.branch} — {r.edition}</div>
                           <div style={{ fontSize: 11, color: "#888" }}>{r.state}</div>
+                          <div style={{ fontSize: 10, color: "#bbb" }}>{r.count} din · avg early</div>
                         </div>
-                        <span style={{ fontSize: 10, background: d.type === "ontime" ? "#e6f1fb" : "#eaf3de", color: d.type === "ontime" ? "#185fa5" : "#3b6d11", padding: "2px 8px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>{d.label}</span>
+                        <span style={{ fontSize: 10, background: "#eaf3de", color: "#3b6d11", padding: "2px 8px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>{d.label} avg</span>
                       </div>
                     );
                   })}
