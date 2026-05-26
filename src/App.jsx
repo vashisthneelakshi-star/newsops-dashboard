@@ -159,7 +159,7 @@ export default function App() {
         const row = {}; hdrs.forEach((h, i) => row[h] = v[i] || "");
         return { month: row.month||"", date: row.date||"", state: row.state||"", branch: row.branch||"", edition: row.edition||"", pullout: row.pullout||"None", st: row.scheduletime||row.schedule_time||"00:00", rt: row.releasetime||row.release_time||"00:00", cause: row.delaycause||row.delay_cause||row.reason||"" };
       }).filter(r => r.state && r.edition);
-      if (rows.length) { setData(p => [...p, ...rows]); setShowUp(false); }
+      if (rows.length) { setData(rows); setShowUp(false); }
     };
     rd.readAsText(f);
   };
