@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 
 const MONTH_NAMES = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
 
-// Parse date: "01.11.25" or "2026-05-25"
 function parseDate(raw) {
   if (!raw) return { date: "", month: "" };
   raw = raw.trim();
@@ -25,7 +24,6 @@ function parseDate(raw) {
   return { date: raw, month: "" };
 }
 
-// Parse month: "11" → "November"
 function parseMonth(raw) {
   if (!raw) return "";
   raw = raw.trim();
@@ -34,49 +32,30 @@ function parseMonth(raw) {
   return raw;
 }
 
-// Parse full datetime "10/31/2025 22:00" or "11/1/2025 1:30" → { display: "22:00", totalMins }
-// totalMins includes actual calendar date so cross-midnight diff works correctly
 function parseDateTime(raw) {
   if (!raw) return { display: "00:00", totalMins: 0 };
   raw = raw.trim();
-
   if (raw.includes(" ")) {
     const spaceIdx = raw.lastIndexOf(" ");
     const datePart = raw.slice(0, spaceIdx).trim();
     const timePart = raw.slice(spaceIdx + 1).trim();
-
-    // Date: M/D/YYYY
     const dp = datePart.split("/");
     let dayMins = 0;
     if (dp.length === 3) {
-      const mo = parseInt(dp[0]);
-      const dy = parseInt(dp[1]);
-      const yr = parseInt(dp[2]);
-      const jsDate = new Date(yr, mo - 1, dy);
+      const jsDate = new Date(parseInt(dp[2]), parseInt(dp[0]) - 1, parseInt(dp[1]));
       dayMins = Math.floor(jsDate.getTime() / 60000);
     }
-
-    // Time: "1:30" or "22:00"
     const tp = timePart.split(":");
     const th = parseInt(tp[0]) || 0;
     const tm = parseInt(tp[1]) || 0;
-    return {
-      display: `${String(th).padStart(2,"0")}:${String(tm).padStart(2,"0")}`,
-      totalMins: dayMins + th * 60 + tm,
-    };
+    return { display: `${String(th).padStart(2,"0")}:${String(tm).padStart(2,"0")}`, totalMins: dayMins + th * 60 + tm };
   }
-
-  // Only time: "22:00" or "1:30"
   const tp = raw.split(":");
   const th = parseInt(tp[0]) || 0;
   const tm = parseInt(tp[1]) || 0;
-  return {
-    display: `${String(th).padStart(2,"0")}:${String(tm).padStart(2,"0")}`,
-    totalMins: th * 60 + tm,
-  };
+  return { display: `${String(th).padStart(2,"0")}:${String(tm).padStart(2,"0")}`, totalMins: th * 60 + tm };
 }
 
-// Diff in minutes using totalMins (handles cross-midnight correctly)
 function tdiff(stObj, rtObj) {
   if (stObj && typeof stObj === "object" && rtObj && typeof rtObj === "object") {
     return rtObj.totalMins - stObj.totalMins;
@@ -90,6 +69,22 @@ function fmtD(m) {
   const h = Math.floor(a / 60), mn = a % 60;
   const s = h > 0 ? `${h}h ${mn}m` : `${mn}m`;
   return m > 0 ? { label: `+${s} Late`, type: "late" } : { label: `-${s} Early`, type: "early" };
+}
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function currentMonthName() {
+  return MONTH_NAMES[new Date().getMonth() + 1];
+}
+
+function currentQuarter() {
+  const m = new Date().getMonth() + 1;
+  if (m <= 3) return "Q1";
+  if (m <= 6) return "Q2";
+  if (m <= 9) return "Q3";
+  return "Q4";
 }
 
 const SC = {
@@ -107,18 +102,71 @@ const QM = {
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
+// ── Custom Range Picker ──────────────────────────────────────────
+function CustomRangePicker({ from, to, onChange }) {
+  return (
+    <span style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+      <label style={{ fontSize: 11, color: "#888" }}>From</label>
+      <input type="date" value={from} onChange={e => onChange(e.target.value, to)}
+        style={{ fontSize: 12, padding: "4px 7px", border: "1px solid #d0d0d0", borderRadius: 6, background: "#fff" }} />
+      <label style={{ fontSize: 11, color: "#888" }}>To</label>
+      <input type="date" value={to} onChange={e => onChange(from, e.target.value)}
+        style={{ fontSize: 12, padding: "4px 7px", border: "1px solid #d0d0d0", borderRadius: 6, background: "#fff" }} />
+    </span>
+  );
+}
+
+function parseCSVRows(text) {
+  const sep = text.indexOf("\t") > -1 ? "\t" : ",";
+  const lines = text.split("\n").filter(Boolean);
+  if (lines.length < 2) return [];
+  const hdrs = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/\s+/g, ""));
+  return lines.slice(1).map(ln => {
+    const vals = ln.split(sep).map(v => v.trim().replace(/^"|"$/g, ""));
+    const row = {};
+    hdrs.forEach((h, i) => row[h] = vals[i] || "");
+    const rawDate = row["date"] || "";
+    const { date: parsedDate, month: monthFromDate } = parseDate(rawDate);
+    const parsedMonth = parseMonth(row["month"] || "") || monthFromDate;
+    const stRaw = row["scheduletime"] || row["schedule_time"] || row["scheduledtime"] || "";
+    const rtRaw = row["releasetime"]  || row["release_time"]  || row["actualtime"]    || "";
+    const stObj = parseDateTime(stRaw);
+    const rtObj = parseDateTime(rtRaw);
+    return {
+      month: parsedMonth, date: parsedDate,
+      state: row["state"] || "", branch: row["branch"] || "",
+      edition: row["edition"] || "", pullout: row["pullout"] || "—",
+      st: stObj.display, rt: rtObj.display, stObj, rtObj,
+      cause: row["delaycause"] || row["delay_cause"] || row["reason"] || row["delayreason"] || "",
+    };
+  }).filter(r => r.state && r.edition);
+}
+
 export default function App() {
-  const [view, setView]         = useState("monthly");
+  const [view, setView]         = useState("daily");
   const [selState, setSelState] = useState("All");
   const [branch, setBranch]     = useState("All");
-  const [date, setDate]         = useState(new Date().toISOString().slice(0,10));
-  const [month, setMonth]       = useState(MONTH_NAMES[new Date().getMonth() + 1]);
-  const [qtr, setQtr]           = useState("Q1");
+
+  // Daily
+  const [date, setDate]         = useState(todayStr());
+
+  // Monthly
+  const [month, setMonth]       = useState(currentMonthName());
+
+  // Quarterly
+  const [qtr, setQtr]           = useState(currentQuarter());
+
+  // Custom range (used in monthly/quarterly/halfyearly/yearly when toggled)
+  const [useCustom, setUseCustom] = useState(false);
+  const [customFrom, setCustomFrom] = useState(todayStr());
+  const [customTo, setCustomTo]     = useState(todayStr());
+
   const [sort, setSort]         = useState("diff");
   const [fstat, setFstat]       = useState("All");
   const [drill, setDrill]       = useState(null);
   const [data, setData]         = useState([]);
   const [showUp, setShowUp]     = useState(false);
+  const [appendMode, setAppendMode] = useState(false); // false = replace, true = append
   const [tab, setTab]           = useState("report");
 
   const states   = useMemo(() => ["All", ...new Set(data.map(d => d.state))], [data]);
@@ -129,23 +177,40 @@ export default function App() {
 
   const base = useMemo(() => {
     let r = data;
-    if (view === "daily")          r = r.filter(x => x.date === date);
-    else if (view === "monthly")   r = r.filter(x => x.month === month);
-    else if (view === "quarterly") r = r.filter(x => QM[qtr].includes(x.month));
-    else r = r.filter(x => ["January","February","March","April","May","June"].includes(x.month));
+
+    if (useCustom && view !== "daily") {
+      // Custom date range filter
+      r = r.filter(x => x.date >= customFrom && x.date <= customTo);
+    } else {
+      if (view === "daily")          r = r.filter(x => x.date === date);
+      else if (view === "monthly")   r = r.filter(x => x.month === month);
+      else if (view === "quarterly") r = r.filter(x => QM[qtr].includes(x.month));
+      else if (view === "halfyearly") r = r.filter(x => ["January","February","March","April","May","June"].includes(x.month));
+      else if (view === "yearly")    r = r; // all data
+    }
+
     if (selState !== "All") r = r.filter(x => x.state === selState);
     if (branch !== "All")   r = r.filter(x => x.branch === branch);
     if (drill)              r = r.filter(x => x.state === drill);
-    // dm = diff in minutes using full datetime objects
+
     r = r.map(x => ({ ...x, dm: tdiff(x.stObj, x.rtObj) }));
+
     if (fstat === "Late")        r = r.filter(x => x.dm > 0);
     else if (fstat === "Early")  r = r.filter(x => x.dm < 0);
     else if (fstat === "OnTime") r = r.filter(x => x.dm === 0);
-    if (sort === "diff")       r = [...r].sort((a, b) => b.dm - a.dm);
-    else if (sort === "state") r = [...r].sort((a, b) => a.state.localeCompare(b.state));
-    else                       r = [...r].sort((a, b) => a.branch.localeCompare(b.branch));
+
+    // Always sort: Late → highest delay first, Early → highest early first, All → late first then early
+    if (sort === "diff") {
+      r = [...r].sort((a, b) => {
+        if (a.dm > 0 && b.dm > 0) return b.dm - a.dm;   // both late: higher delay first
+        if (a.dm < 0 && b.dm < 0) return a.dm - b.dm;   // both early: more early first
+        return b.dm - a.dm;                               // mixed: late first
+      });
+    } else if (sort === "state")  r = [...r].sort((a, b) => a.state.localeCompare(b.state));
+    else if (sort === "branch")   r = [...r].sort((a, b) => a.branch.localeCompare(b.branch));
+
     return r;
-  }, [data, view, date, month, qtr, selState, branch, drill, fstat, sort]);
+  }, [data, view, date, month, qtr, useCustom, customFrom, customTo, selState, branch, drill, fstat, sort]);
 
   const kpi = useMemo(() => {
     const late = base.filter(r => r.dm > 0);
@@ -170,7 +235,6 @@ export default function App() {
     return Object.values(m).sort((a, b) => b.late - a.late);
   }, [base]);
 
-  // Group by state+branch+edition → average delay, count, most common cause
   const groupedTop10 = useMemo(() => {
     const map = {};
     base.forEach(r => {
@@ -187,10 +251,12 @@ export default function App() {
     }));
   }, [base]);
 
+  // Top 10 Late: highest avg delay first
   const top10late  = useMemo(() =>
     [...groupedTop10].filter(r => r.avgDm > 0).sort((a, b) => b.avgDm - a.avgDm).slice(0, 10),
   [groupedTop10]);
 
+  // Top 10 Early: most early first (most negative avgDm first)
   const top10early = useMemo(() =>
     [...groupedTop10].filter(r => r.avgDm < 0).sort((a, b) => a.avgDm - b.avgDm).slice(0, 10),
   [groupedTop10]);
@@ -202,51 +268,27 @@ export default function App() {
     return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([c, n]) => ({ c, n, pct: t ? Math.round(n / t * 100) : 0 }));
   }, [base]);
 
-  const handleCSV = e => {
+  const handleCSV = (e, forceAppend) => {
     const f = e.target.files[0]; if (!f) return;
+    const isAppend = forceAppend !== undefined ? forceAppend : appendMode;
     const rd = new FileReader();
     rd.onload = ev => {
-      const text = ev.target.result;
-      const sep = text.indexOf("\t") > -1 ? "\t" : ",";
-      const lines = text.split("\n").filter(Boolean);
-      if (lines.length < 2) return;
-      const hdrs = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/\s+/g, ""));
-
-      const rows = lines.slice(1).map(ln => {
-        const vals = ln.split(sep).map(v => v.trim().replace(/^"|"$/g, ""));
-        const row = {};
-        hdrs.forEach((h, i) => row[h] = vals[i] || "");
-
-        const rawDate  = row["date"] || "";
-        const { date: parsedDate, month: monthFromDate } = parseDate(rawDate);
-        const parsedMonth = parseMonth(row["month"] || "") || monthFromDate;
-
-        // Store full datetime objects for accurate diff
-        const stRaw = row["scheduletime"] || row["schedule_time"] || row["scheduledtime"] || "";
-        const rtRaw = row["releasetime"]  || row["release_time"]  || row["actualtime"]    || "";
-        const stObj = parseDateTime(stRaw);
-        const rtObj = parseDateTime(rtRaw);
-
-        return {
-          month:   parsedMonth,
-          date:    parsedDate,
-          state:   row["state"]   || "",
-          branch:  row["branch"]  || "",
-          edition: row["edition"] || "",
-          pullout: row["pullout"] || "—",
-          st:      stObj.display,
-          rt:      rtObj.display,
-          stObj,
-          rtObj,
-          cause:   row["delaycause"] || row["delay_cause"] || row["reason"] || row["delayreason"] || "",
-        };
-      }).filter(r => r.state && r.edition);
-
+      const rows = parseCSVRows(ev.target.result);
       if (rows.length) {
-        setData(rows);
+        if (isAppend) {
+          // Append: add new rows, avoid exact duplicates by date+edition+branch
+          setData(prev => {
+            const existingKeys = new Set(prev.map(r => `${r.date}||${r.edition}||${r.branch}`));
+            const newRows = rows.filter(r => !existingKeys.has(`${r.date}||${r.edition}||${r.branch}`));
+            return [...prev, ...newRows];
+          });
+        } else {
+          setData(rows);
+          if (rows[0].month) setMonth(rows[0].month);
+          if (rows[0].date)  setDate(rows[0].date);
+        }
         setShowUp(false);
-        if (rows[0].month) setMonth(rows[0].month);
-        if (rows[0].date)  setDate(rows[0].date);
+        e.target.value = "";
       }
     };
     rd.readAsText(f);
@@ -271,11 +313,13 @@ export default function App() {
 
   const sectionTabs = [["report","Full Report"],["states","State Overview"],["top10","Top 10 Lists"],["causes","Delay Analysis"]];
 
+  const showCustomToggle = view !== "daily";
+
   return (
     <div style={{ minHeight: "100vh", background: "#f4f5f7", padding: "16px" }}>
-      <div style={{ maxWidth: 960, margin: "0 auto", background: "#fff", borderRadius: 14, padding: "20px 24px", boxShadow: "0 1px 4px rgba(0,0,0,.08)" }}>
+      <div style={{ maxWidth: 980, margin: "0 auto", background: "#fff", borderRadius: 14, padding: "20px 24px", boxShadow: "0 1px 4px rgba(0,0,0,.08)" }}>
 
-        {/* Header */}
+        {/* ── Header ── */}
         <div style={{ borderBottom: "1px solid #eee", paddingBottom: 14, marginBottom: 18, display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
@@ -286,39 +330,43 @@ export default function App() {
             <div style={{ fontSize: 12, color: "#888" }}>Print Media Operations Dashboard · {data.length} records loaded</div>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button onClick={() => setShowUp(!showUp)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", border: "1px solid #d0d0d0", borderRadius: 7, background: "#fff", color: "#555", fontSize: 12, cursor: "pointer" }}>
-              <i className="ti ti-upload" aria-hidden="true" style={{ fontSize: 14 }}></i> Import CSV
+            <button onClick={() => { setAppendMode(false); setShowUp(!showUp); }} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", border: "1px solid #d0d0d0", borderRadius: 7, background: "#fff", color: "#555", fontSize: 12, cursor: "pointer" }}>
+              <i className="ti ti-upload" aria-hidden="true" style={{ fontSize: 14 }}></i> Replace Data
+            </button>
+            <button onClick={() => { setAppendMode(true); setShowUp(!showUp); }} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", border: "1px solid #3b6d11", borderRadius: 7, background: "#eaf3de", color: "#3b6d11", fontSize: 12, cursor: "pointer" }}>
+              <i className="ti ti-plus" aria-hidden="true" style={{ fontSize: 14 }}></i> Add Today's Data
             </button>
             <button onClick={exportCSV} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", border: "1px solid #d0d0d0", borderRadius: 7, background: "#fff", color: "#555", fontSize: 12, cursor: "pointer" }}>
               <i className="ti ti-download" aria-hidden="true" style={{ fontSize: 14 }}></i> Export
             </button>
             <button onClick={() => setData([])} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", border: "1px solid #ffcccc", borderRadius: 7, background: "#fff0f0", color: "#a32d2d", fontSize: 12, cursor: "pointer" }}>
-              <i className="ti ti-trash" aria-hidden="true" style={{ fontSize: 14 }}></i> Clear Data
+              <i className="ti ti-trash" aria-hidden="true" style={{ fontSize: 14 }}></i> Clear
             </button>
           </div>
         </div>
 
-        {/* CSV Upload Panel */}
+        {/* ── Upload Panel ── */}
         {showUp && (
-          <div style={{ background: "#f8f9fa", border: "1px solid #e0e0e0", borderRadius: 9, padding: "14px 16px", marginBottom: 16, fontSize: 12 }}>
-            <div style={{ fontWeight: 500, marginBottom: 4, fontSize: 13 }}>Upload Daily Sheet</div>
+          <div style={{ background: appendMode ? "#f0f7ea" : "#f8f9fa", border: `1px solid ${appendMode ? "#97c459" : "#e0e0e0"}`, borderRadius: 9, padding: "14px 16px", marginBottom: 16, fontSize: 12 }}>
+            <div style={{ fontWeight: 500, marginBottom: 4, fontSize: 13, color: appendMode ? "#3b6d11" : "#111" }}>
+              {appendMode ? "➕ Add Today's Sheet (Purana data rahega, naya jud jaayega)" : "📂 Replace All Data (Purana data hat jaayega)"}
+            </div>
             <div style={{ color: "#888", marginBottom: 8 }}>
-              Tab-separated (.tsv) ya Comma-separated (.csv) dono chalega<br/>
               Columns: Month · Date · State · Branch · Edition · Pullout · Schedule Time · Release Time · Delay Cause<br/>
-              Date: <code>01.11.25</code> &nbsp;|&nbsp; Time: <code>10/31/2025 22:00</code> ya <code>11/1/2025 1:30</code>
+              {appendMode && <span style={{ color: "#3b6d11" }}>⚠️ Same date+edition+branch ke duplicate rows skip ho jaayenge</span>}
+              {!appendMode && <span style={{ color: "#a32d2d" }}>⚠️ Is se poora purana data replace ho jaayega</span>}
             </div>
             <input type="file" accept=".csv,.tsv,.txt" onChange={handleCSV} />
-            <div style={{ marginTop: 8, color: "#a32d2d", fontSize: 11 }}>⚠️ Import karne se purana data replace ho jaayega</div>
           </div>
         )}
 
-        {/* No data */}
+        {/* ── No Data ── */}
         {data.length === 0 && (
           <div style={{ textAlign: "center", padding: "48px 20px", color: "#aaa" }}>
             <i className="ti ti-file-upload" style={{ fontSize: 52, display: "block", marginBottom: 12 }}></i>
             <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 8, color: "#888" }}>Koi Data Nahi</div>
             <div style={{ fontSize: 13, marginBottom: 16 }}>Apni daily CSV/TSV sheet import karein</div>
-            <button onClick={() => setShowUp(true)} style={{ padding: "9px 22px", background: "#185fa5", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
+            <button onClick={() => { setAppendMode(false); setShowUp(true); }} style={{ padding: "9px 22px", background: "#185fa5", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
               Import CSV Sheet
             </button>
           </div>
@@ -326,14 +374,14 @@ export default function App() {
 
         {data.length > 0 && (
           <>
-            {/* KPI Cards */}
+            {/* ── KPI Cards ── */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8, marginBottom: 18 }}>
               {[
-                { l: "Total Editions", v: kpi.total,      ic: "ti-layout-grid",      bg: "#f5f5f5", c: "#333" },
-                { l: "Late",          v: kpi.late,        ic: "ti-clock-exclamation", bg: "#fff0f0", c: "#a32d2d" },
-                { l: "On Time",       v: kpi.ontime,      ic: "ti-circle-check",      bg: "#e6f1fb", c: "#185fa5" },
-                { l: "Early Release", v: kpi.early,       ic: "ti-bolt",              bg: "#eaf3de", c: "#3b6d11" },
-                { l: "Avg Delay",     v: `${kpi.avg}m`,   ic: "ti-trending-up",       bg: "#faeeda", c: "#854f0b" },
+                { l: "Total Editions", v: kpi.total,    ic: "ti-layout-grid",       bg: "#f5f5f5", c: "#333" },
+                { l: "Late",          v: kpi.late,      ic: "ti-clock-exclamation", bg: "#fff0f0", c: "#a32d2d" },
+                { l: "On Time",       v: kpi.ontime,    ic: "ti-circle-check",      bg: "#e6f1fb", c: "#185fa5" },
+                { l: "Early Release", v: kpi.early,     ic: "ti-bolt",              bg: "#eaf3de", c: "#3b6d11" },
+                { l: "Avg Delay",     v: `${kpi.avg}m`, ic: "ti-trending-up",       bg: "#faeeda", c: "#854f0b" },
               ].map(k => (
                 <div key={k.l} style={{ background: k.bg, borderRadius: 9, padding: "11px 13px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
@@ -345,60 +393,83 @@ export default function App() {
               ))}
             </div>
 
-            {/* View Pills */}
-            <div style={{ display: "flex", gap: 5, marginBottom: 14, flexWrap: "wrap" }}>
-              {[["daily","Daily"],["monthly","Monthly"],["quarterly","Quarterly"],["halfyearly","Half-Yearly"]].map(([k,l]) => (
-                <Pill key={k} label={l} active={view === k} onClick={() => { setView(k); setDrill(null); }} />
+            {/* ── View Pills ── */}
+            <div style={{ display: "flex", gap: 5, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+              {[["daily","Daily"],["monthly","Monthly"],["quarterly","Quarterly"],["halfyearly","Half-Yearly"],["yearly","Yearly"]].map(([k,l]) => (
+                <Pill key={k} label={l} active={view === k} onClick={() => { setView(k); setDrill(null); setUseCustom(false); }} />
               ))}
+              {showCustomToggle && (
+                <button
+                  onClick={() => setUseCustom(p => !p)}
+                  style={{ marginLeft: 6, padding: "5px 12px", borderRadius: 20, border: `1.5px solid ${useCustom ? "#854f0b" : "#d0d0d0"}`, background: useCustom ? "#faeeda" : "transparent", color: useCustom ? "#854f0b" : "#888", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                  <i className="ti ti-calendar-event" style={{ fontSize: 13 }}></i>
+                  {useCustom ? "Custom Range ✓" : "Custom Range"}
+                </button>
+              )}
             </div>
 
-            {/* Filters */}
+            {/* ── Filters ── */}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14, padding: "10px 12px", background: "#f8f9fa", borderRadius: 9, alignItems: "center" }}>
               <i className="ti ti-adjustments-horizontal" aria-hidden="true" style={{ fontSize: 15, color: "#aaa" }}></i>
+
+              {/* Date controls */}
               {view === "daily" && (
                 <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                   <label style={{ fontSize: 11, color: "#888" }}>Date</label>
-                  <input type="date" value={date} onChange={e => setDate(e.target.value)} />
+                  <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                    style={{ fontSize: 12, padding: "4px 7px", border: "1px solid #d0d0d0", borderRadius: 6, background: "#fff" }} />
                 </span>
               )}
-              {view === "monthly" && (
+              {view === "monthly" && !useCustom && (
                 <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                   <label style={{ fontSize: 11, color: "#888" }}>Month</label>
-                  <select value={month} onChange={e => setMonth(e.target.value)}>
+                  <select value={month} onChange={e => setMonth(e.target.value)}
+                    style={{ fontSize: 12, padding: "4px 7px", border: "1px solid #d0d0d0", borderRadius: 6, background: "#fff" }}>
                     {MONTHS.map(m => <option key={m}>{m}</option>)}
                   </select>
                 </span>
               )}
-              {view === "quarterly" && (
+              {view === "quarterly" && !useCustom && (
                 <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                   <label style={{ fontSize: 11, color: "#888" }}>Quarter</label>
-                  <select value={qtr} onChange={e => setQtr(e.target.value)}>
+                  <select value={qtr} onChange={e => setQtr(e.target.value)}
+                    style={{ fontSize: 12, padding: "4px 7px", border: "1px solid #d0d0d0", borderRadius: 6, background: "#fff" }}>
                     {["Q1","Q2","Q3","Q4"].map(q => <option key={q}>{q}</option>)}
                   </select>
                 </span>
               )}
+              {useCustom && view !== "daily" && (
+                <CustomRangePicker from={customFrom} to={customTo}
+                  onChange={(f, t) => { setCustomFrom(f); setCustomTo(t); }} />
+              )}
+
+              {/* State / Branch / Status / Sort */}
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <label style={{ fontSize: 11, color: "#888" }}>State</label>
-                <select value={selState} onChange={e => { setSelState(e.target.value); setBranch("All"); setDrill(null); }}>
+                <select value={selState} onChange={e => { setSelState(e.target.value); setBranch("All"); setDrill(null); }}
+                  style={{ fontSize: 12, padding: "4px 7px", border: "1px solid #d0d0d0", borderRadius: 6, background: "#fff" }}>
                   {states.map(s => <option key={s}>{s}</option>)}
                 </select>
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <label style={{ fontSize: 11, color: "#888" }}>Branch</label>
-                <select value={branch} onChange={e => setBranch(e.target.value)}>
+                <select value={branch} onChange={e => setBranch(e.target.value)}
+                  style={{ fontSize: 12, padding: "4px 7px", border: "1px solid #d0d0d0", borderRadius: 6, background: "#fff" }}>
                   {branches.map(b => <option key={b}>{b}</option>)}
                 </select>
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <label style={{ fontSize: 11, color: "#888" }}>Status</label>
-                <select value={fstat} onChange={e => setFstat(e.target.value)}>
+                <select value={fstat} onChange={e => setFstat(e.target.value)}
+                  style={{ fontSize: 12, padding: "4px 7px", border: "1px solid #d0d0d0", borderRadius: 6, background: "#fff" }}>
                   {["All","Late","OnTime","Early"].map(s => <option key={s}>{s}</option>)}
                 </select>
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <label style={{ fontSize: 11, color: "#888" }}>Sort</label>
-                <select value={sort} onChange={e => setSort(e.target.value)}>
-                  <option value="diff">By Delay</option>
+                <select value={sort} onChange={e => setSort(e.target.value)}
+                  style={{ fontSize: 12, padding: "4px 7px", border: "1px solid #d0d0d0", borderRadius: 6, background: "#fff" }}>
+                  <option value="diff">By Delay ↕</option>
                   <option value="state">By State</option>
                   <option value="branch">By Branch</option>
                 </select>
@@ -410,17 +481,20 @@ export default function App() {
               )}
             </div>
 
-            {/* Section Tabs */}
+            {/* ── Section Tabs ── */}
             <div style={{ display: "flex", marginBottom: 16, borderBottom: "1px solid #eee" }}>
               {sectionTabs.map(([k, l]) => (
                 <button key={k} onClick={() => setTab(k)} style={{ padding: "7px 15px", fontSize: 12, border: "none", background: "transparent", cursor: "pointer", color: tab === k ? "#185fa5" : "#888", borderBottom: tab === k ? "2px solid #185fa5" : "2px solid transparent", fontWeight: tab === k ? 500 : 400 }}>{l}</button>
               ))}
             </div>
 
-            {/* TAB: Full Report */}
+            {/* ── TAB: Full Report ── */}
             {tab === "report" && (
               <div>
-                <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>{drill ? `Drill-down: ${drill} — ` : ""}Showing {base.length} editions</div>
+                <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>
+                  {drill ? `Drill-down: ${drill} — ` : ""}Showing {base.length} editions
+                  {useCustom && view !== "daily" && <span style={{ marginLeft: 8, color: "#854f0b" }}>({customFrom} → {customTo})</span>}
+                </div>
                 <div style={{ overflowX: "auto", border: "1px solid #eee", borderRadius: 10 }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 700 }}>
                     <thead>
@@ -457,7 +531,7 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB: State Overview */}
+            {/* ── TAB: State Overview ── */}
             {tab === "states" && (
               <div>
                 <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>State card pe click karein — uss state ki saari editions dikhegi</div>
@@ -485,50 +559,49 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB: Top 10 */}
+            {/* ── TAB: Top 10 ── */}
             {tab === "top10" && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <div style={{ border: "1px solid #f09595", borderRadius: 10, padding: 14 }}>
                   <div style={{ fontSize: 13, fontWeight: 500, color: "#a32d2d", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
                     <i className="ti ti-alert-triangle" aria-hidden="true" style={{ fontSize: 15 }}></i> Top 10 Late Editions
                   </div>
+                  <div style={{ fontSize: 11, color: "#aaa", marginBottom: 10 }}>Avg delay · High → Low</div>
                   {top10late.length === 0 && <div style={{ fontSize: 12, color: "#aaa" }}>No late editions</div>}
                   {top10late.map((r, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
-                      <span style={{ fontSize: 11, fontWeight: 500, color: "#a32d2d", minWidth: 20, textAlign: "right" }}>#{i+1}</span>
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, paddingBottom: 10, borderBottom: i < top10late.length - 1 ? "1px solid #fef0f0" : "none" }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#a32d2d", minWidth: 24, textAlign: "right" }}>#{i+1}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.branch} — {r.edition}</div>
                         <div style={{ fontSize: 11, color: "#888" }}>{r.state}{r.topCause ? " · " + r.topCause : ""}</div>
-                        <div style={{ fontSize: 10, color: "#bbb" }}>{r.count} din · avg delay</div>
+                        <div style={{ fontSize: 10, color: "#bbb" }}>{r.count} din ka data</div>
                       </div>
-                      <span style={{ fontSize: 10, background: "#fff0f0", color: "#a32d2d", padding: "2px 8px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>+{r.avgDm}m avg</span>
+                      <span style={{ fontSize: 11, background: "#fff0f0", color: "#a32d2d", padding: "3px 9px", borderRadius: 8, fontWeight: 700, whiteSpace: "nowrap" }}>+{r.avgDm}m</span>
                     </div>
                   ))}
                 </div>
                 <div style={{ border: "1px solid #97c459", borderRadius: 10, padding: 14 }}>
                   <div style={{ fontSize: 13, fontWeight: 500, color: "#3b6d11", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                    <i className="ti ti-award" aria-hidden="true" style={{ fontSize: 15 }}></i> Top 10 Early / On-Time
+                    <i className="ti ti-award" aria-hidden="true" style={{ fontSize: 15 }}></i> Top 10 Early Editions
                   </div>
+                  <div style={{ fontSize: 11, color: "#aaa", marginBottom: 10 }}>Avg early · High → Low</div>
                   {top10early.length === 0 && <div style={{ fontSize: 12, color: "#aaa" }}>No early editions in this selection</div>}
-                  {top10early.map((r, i) => {
-                    const d = fmtD(r.avgDm);
-                    return (
-                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
-                        <span style={{ fontSize: 11, fontWeight: 500, color: "#3b6d11", minWidth: 20, textAlign: "right" }}>#{i+1}</span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.branch} — {r.edition}</div>
-                          <div style={{ fontSize: 11, color: "#888" }}>{r.state}</div>
-                          <div style={{ fontSize: 10, color: "#bbb" }}>{r.count} din · avg early</div>
-                        </div>
-                        <span style={{ fontSize: 10, background: "#eaf3de", color: "#3b6d11", padding: "2px 8px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>{d.label} avg</span>
+                  {top10early.map((r, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, paddingBottom: 10, borderBottom: i < top10early.length - 1 ? "1px solid #f0f7ea" : "none" }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#3b6d11", minWidth: 24, textAlign: "right" }}>#{i+1}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.branch} — {r.edition}</div>
+                        <div style={{ fontSize: 11, color: "#888" }}>{r.state}</div>
+                        <div style={{ fontSize: 10, color: "#bbb" }}>{r.count} din ka data</div>
                       </div>
-                    );
-                  })}
+                      <span style={{ fontSize: 11, background: "#eaf3de", color: "#3b6d11", padding: "3px 9px", borderRadius: 8, fontWeight: 700, whiteSpace: "nowrap" }}>{fmtD(r.avgDm).label}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
 
-            {/* TAB: Delay Causes */}
+            {/* ── TAB: Delay Causes ── */}
             {tab === "causes" && (
               <div>
                 <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>Current filter ke liye delay cause breakdown</div>
