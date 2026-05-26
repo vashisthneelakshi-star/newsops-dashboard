@@ -199,8 +199,8 @@ export default function App() {
             <button onClick={() => setShowUp(!showUp)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", border: "1px solid #d0d0d0", borderRadius: 7, background: "#fff", color: "#555", fontSize: 12, cursor: "pointer" }}>
               <i className="ti ti-upload" aria-hidden="true" style={{ fontSize: 14 }}></i> Import CSV
             </button>
-            <button onClick={exportCSV} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", border: "1px solid #d0d0d0", borderRadius: 7, background: "#fff", color: "#555", fontSize: 12, cursor: "pointer" }}>
-              <i className="ti ti-download" aria-hidden="true" style={{ fontSize: 14 }}></i> Export
+            <button onClick={() => setData([])} style={{ display:"flex", alignItems:"center", gap:5, padding:"6px 12px", border:"1px solid #ffcccc", borderRadius:7, background:"#fff0f0", color:"#a32d2d", fontSize:12, cursor:"pointer" }}>
+            <i className="ti ti-trash" aria-hidden="true" style={{ fontSize:14 }}></i> Clear Data
             </button>
           </div>
         </div>
