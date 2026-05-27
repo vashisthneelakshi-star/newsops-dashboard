@@ -116,7 +116,7 @@ function parseCSVText(text) {
       edition: row["edition"]||"", pullout: row["pullout"]||"—",
       st: stObj.display, rt: rtObj.display, stObj, rtObj,
       cause: row["delaycause"]||row["delay_cause"]||row["reason"]||row["delayreason"]||"",
-      delayOntime: row["delayontime"]||row["delay/ontime"]||row["delayorontime"]||row["ontime"]||"",
+      delayOntime: row["ontime-aspereho"]||row["ontimeaspereho"]||row["delayontime"]||row["delay/ontime"]||row["delayorontime"]||row["ontime"]||"",
     };
   }).filter(r => r.state && r.edition);
 }
