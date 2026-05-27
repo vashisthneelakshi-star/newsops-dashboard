@@ -459,7 +459,7 @@ export default function App() {
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:700}}>
                     <thead>
                       <tr style={{background:"#f8f9fa"}}>
-                        {["State","Branch","Edition","Pullout","Scheduled","Released","Difference","Reason","Delay/Ontime"].map(h=>(
+                        {["State","Branch","Edition","Pullout","Scheduled","Released","Delay/On Time","Reason","On Time-As per EHO"].map(h=>(
                           <th key={h} style={{padding:"8px 10px",textAlign:"left",fontWeight:500,color:"#888",borderBottom:"1px solid #eee",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>
                         ))}
                       </tr>
