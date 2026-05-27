@@ -272,8 +272,8 @@ export default function App() {
       <div style={{minHeight:"100vh",background:"#f4f5f7",display:"flex",alignItems:"center",justifyContent:"center"}}>
         <div style={{textAlign:"center",padding:40}}>
           <div style={{width:40,height:40,border:"3px solid #e0e0e0",borderTop:"3px solid #185fa5",borderRadius:"50%",margin:"0 auto 16px",animation:"spin 1s linear infinite"}}></div>
-          <div style={{fontSize:15,fontWeight:500,color:"#555",marginBottom:6}}>Google Sheet se data load ho raha hai...</div>
-          <div style={{fontSize:12,color:"#aaa"}}>Pehli baar thoda time lagta hai</div>
+          <div style={{fontSize:15,fontWeight:500,color:"#555",marginBottom:6}}>Loading data from Google Sheet...</div>
+          <div style={{fontSize:12,color:"#aaa"}}>This may take a moment on first load</div>
           <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         </div>
       </div>
@@ -294,7 +294,7 @@ export default function App() {
               <span style={{background:"#e6f1fb",color:"#185fa5",fontSize:10,padding:"2px 8px",borderRadius:10,fontWeight:500}}>LIVE</span>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:10,fontSize:12,color:"#888",flexWrap:"wrap"}}>
-              <span>{data.length} records · Google Sheet se live</span>
+              <span>{data.length} records · Live from Google Sheet</span>
               {lastSync && <span>· Last sync: {lastSync.toLocaleTimeString()}</span>}
               {syncError && <span style={{color:"#a32d2d"}}>· ⚠️ Sync error</span>}
             </div>
@@ -319,8 +319,8 @@ export default function App() {
         {data.length > 0 && (
           <div style={{background:"#f0f7ea",border:"1px solid #97c459",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:12,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
             <i className="ti ti-info-circle" style={{fontSize:15,color:"#3b6d11"}}></i>
-            <span style={{color:"#3b6d11",fontWeight:500}}>Data update karna ho to:</span>
-            <span style={{color:"#555"}}>"Edit Sheet" button se Google Sheet mein data add/edit karo → "Refresh" button dabao → Dashboard update ho jaayega!</span>
+            <span style={{color:"#3b6d11",fontWeight:500}}>To update data:</span>
+            <span style={{color:"#555"}}>Add or edit data in the Google Sheet via "Edit Sheet" → Click "Refresh" → Dashboard will update automatically!</span>
           </div>
         )}
 
@@ -328,8 +328,8 @@ export default function App() {
         {data.length === 0 && !loading && (
           <div style={{textAlign:"center",padding:"48px 20px",color:"#aaa"}}>
             <i className="ti ti-table-off" style={{fontSize:52,display:"block",marginBottom:12}}></i>
-            <div style={{fontSize:16,fontWeight:500,marginBottom:8,color:"#888"}}>Google Sheet Mein Data Nahi Hai</div>
-            <div style={{fontSize:13,marginBottom:16,color:"#aaa"}}>Sheet mein data add karo — headers sahi hone chahiye</div>
+            <div style={{fontSize:16,fontWeight:500,marginBottom:8,color:"#888"}}>No Data in Google Sheet</div>
+            <div style={{fontSize:13,marginBottom:16,color:"#aaa"}}>Add data to the Sheet with the correct column headers</div>
             <a href={`https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`} target="_blank" rel="noreferrer"
               style={{padding:"9px 22px",background:"#185fa5",color:"#fff",border:"none",borderRadius:8,fontSize:13,textDecoration:"none",display:"inline-block"}}>
               Google Sheet Kholo
@@ -483,7 +483,7 @@ export default function App() {
             {/* ── TAB: State Overview ── */}
             {tab==="states"&&(
               <div>
-                <div style={{fontSize:12,color:"#888",marginBottom:12}}>State card pe click karein — uss state ki saari editions dikhegi</div>
+                <div style={{fontSize:12,color:"#888",marginBottom:12}}>Click on a state card to drill down into its editions</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10}}>
                   {stStats.map(s=>(
                     <button key={s.state} onClick={()=>{setDrill(s.state);setTab("report");}} style={{background:"#fff",border:`1px solid ${s.late>0?"#f09595":"#e0e0e0"}`,borderRadius:10,padding:"12px",cursor:"pointer",textAlign:"left"}}>
@@ -523,7 +523,7 @@ export default function App() {
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:12,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.branch} — {r.edition}</div>
                         <div style={{fontSize:11,color:"#888"}}>{r.state}{r.topCause?" · "+r.topCause:""}</div>
-                        <div style={{fontSize:10,color:"#bbb"}}>{r.count} din ka data</div>
+                        <div style={{fontSize:10,color:"#bbb"}}>{r.count} days of data</div>
                       </div>
                       <span style={{fontSize:11,background:"#fff0f0",color:"#a32d2d",padding:"3px 9px",borderRadius:8,fontWeight:700,whiteSpace:"nowrap"}}>+{r.avgDm}m</span>
                     </div>
@@ -541,7 +541,7 @@ export default function App() {
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:12,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.branch} — {r.edition}</div>
                         <div style={{fontSize:11,color:"#888"}}>{r.state}</div>
-                        <div style={{fontSize:10,color:"#bbb"}}>{r.count} din ka data</div>
+                        <div style={{fontSize:10,color:"#bbb"}}>{r.count} days of data</div>
                       </div>
                       <span style={{fontSize:11,background:"#eaf3de",color:"#3b6d11",padding:"3px 9px",borderRadius:8,fontWeight:700,whiteSpace:"nowrap"}}>{fmtD(r.avgDm).label}</span>
                     </div>
@@ -553,14 +553,14 @@ export default function App() {
             {/* ── TAB: Delay Causes ── */}
             {tab==="causes"&&(
               <div>
-                <div style={{fontSize:12,color:"#888",marginBottom:12}}>Current filter ke liye delay cause breakdown</div>
-                {causes.length===0&&<div style={{fontSize:12,color:"#aaa"}}>Is selection mein koi delay cause nahi hai.</div>}
+                <div style={{fontSize:12,color:"#888",marginBottom:12}}>Delay cause breakdown for current filter selection</div>
+                {causes.length===0&&<div style={{fontSize:12,color:"#aaa"}}>No delay causes recorded for this selection.</div>}
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
                   {causes.map(({c,n,pct})=>(
                     <div key={c} style={{background:"#fafafa",border:"1px solid #eee",borderRadius:8,padding:"10px 14px"}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                         <span style={{fontSize:13,fontWeight:500}}>{c}</span>
-                        <span style={{fontSize:12,color:"#a32d2d",fontWeight:500}}>{n} baar ({pct}%)</span>
+                        <span style={{fontSize:12,color:"#a32d2d",fontWeight:500}}>{n} times ({pct}%)</span>
                       </div>
                       <div style={{height:5,borderRadius:3,background:"#eee",overflow:"hidden"}}>
                         <div style={{height:"100%",width:`${pct}%`,background:"#a32d2d",borderRadius:3}}></div>
@@ -574,7 +574,7 @@ export default function App() {
         )}
 
         <div style={{marginTop:20,fontSize:11,color:"#bbb",textAlign:"center"}}>
-          Print Media Operations · Edition Release Tracker · {data.length} records · Google Sheets powered
+          Print Media Operations · Edition Release Tracker · {data.length} records · Powered by Google Sheets
         </div>
       </div>
     </div>
