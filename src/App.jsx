@@ -116,6 +116,7 @@ function parseCSVText(text) {
       edition: row["edition"]||"", pullout: row["pullout"]||"—",
       st: stObj.display, rt: rtObj.display, stObj, rtObj,
       cause: row["delaycause"]||row["delay_cause"]||row["reason"]||row["delayreason"]||"",
+      delayOntime: row["delayontime"]||row["delay/ontime"]||row["delayorontime"]||row["ontime"]||"",
     };
   }).filter(r => r.state && r.edition);
 }
@@ -200,7 +201,15 @@ export default function App() {
     if (selState!=="All") r = r.filter(x=>x.state===selState);
     if (branch!=="All")   r = r.filter(x=>x.branch===branch);
     if (drill)            r = r.filter(x=>x.state===drill);
-    r = r.map(x=>({...x, dm: tdiff(x.stObj,x.rtObj)}));
+    r = r.map(x=>{
+      const rawDm = tdiff(x.stObj, x.rtObj);
+      // Daily view: always use actual time diff
+      // Monthly/Quarterly/Half-yearly/Yearly: if Delay/Ontime column marked as "ontime", treat as 0 (on time)
+      const markedOntime = x.delayOntime && 
+        x.delayOntime.trim().toLowerCase().replace(/[\s\/\-_]/g,"").includes("ontime");
+      const dm = (view !== "daily" && markedOntime) ? 0 : rawDm;
+      return {...x, dm, rawDm};
+    });
     if (fstat==="Late")        r = r.filter(x=>x.dm>0);
     else if (fstat==="Early")  r = r.filter(x=>x.dm<0);
     else if (fstat==="OnTime") r = r.filter(x=>x.dm===0);
@@ -450,13 +459,13 @@ export default function App() {
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:700}}>
                     <thead>
                       <tr style={{background:"#f8f9fa"}}>
-                        {["State","Branch","Edition","Pullout","Scheduled","Released","Difference","Reason"].map(h=>(
+                        {["State","Branch","Edition","Pullout","Scheduled","Released","Difference","Reason","Delay/Ontime"].map(h=>(
                           <th key={h} style={{padding:"8px 10px",textAlign:"left",fontWeight:500,color:"#888",borderBottom:"1px solid #eee",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {base.length===0&&<tr><td colSpan={8} style={{padding:24,textAlign:"center",color:"#aaa"}}>No data for this selection.</td></tr>}
+                      {base.length===0&&<tr><td colSpan={9} style={{padding:24,textAlign:"center",color:"#aaa"}}>No data for this selection.</td></tr>}
                       {base.map((r,i)=>{
                         const d=fmtD(r.dm); const sc=SC[d.type];
                         return (
@@ -471,6 +480,15 @@ export default function App() {
                               <span style={{background:sc.bg,color:sc.color,border:`1px solid ${sc.bd}`,borderRadius:8,fontSize:10,padding:"3px 8px",fontWeight:600,whiteSpace:"nowrap"}}>{d.label}</span>
                             </td>
                             <td style={{padding:"7px 10px",color:r.cause?"#854f0b":"#ccc",fontSize:11}}>{r.cause||"—"}</td>
+                            <td style={{padding:"7px 10px",fontSize:11}}>
+                              {r.delayOntime ? (
+                                <span style={{
+                                  background: r.delayOntime.trim().toLowerCase().replace(/[\s\/\-_]/g,"").includes("ontime") ? "#e6f1fb" : "#fff0f0",
+                                  color: r.delayOntime.trim().toLowerCase().replace(/[\s\/\-_]/g,"").includes("ontime") ? "#185fa5" : "#a32d2d",
+                                  padding:"2px 7px", borderRadius:8, fontSize:10, fontWeight:500
+                                }}>{r.delayOntime}</span>
+                              ) : <span style={{color:"#ccc"}}>—</span>}
+                            </td>
                           </tr>
                         );
                       })}
