@@ -1,11 +1,9 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 
-// ── Google Sheet Config ──────────────────────────────────────────
 const SHEET_ID = "1Iv3T-ah2Ed2euConb8_cxgF4nyX-BuXmbqoYM1F5zFQ";
 const SHEET_NAME = "Sheet1";
 const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAME}`;
 
-// ── Constants ────────────────────────────────────────────────────
 const MONTH_NAMES = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const QM = {
@@ -16,11 +14,9 @@ const QM = {
 };
 const SC = {
   late:   { bg: "#fff0f0", color: "#a32d2d", bd: "#f09595" },
-  early:  { bg: "#eaf3de", color: "#3b6d11", bd: "#97c459" },
   ontime: { bg: "#e6f1fb", color: "#185fa5", bd: "#85b7eb" },
 };
 
-// ── Helpers ──────────────────────────────────────────────────────
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 function currentMonthName() { return MONTH_NAMES[new Date().getMonth() + 1]; }
 function currentQuarter() {
@@ -79,17 +75,23 @@ function tdiff(s, r) {
   return 0;
 }
 
-function fmtD(m) {
-  if (m === 0) return { label:"On Time", type:"ontime" };
-  const a = Math.abs(m), h = Math.floor(a/60), mn = a%60;
-  const s = h > 0 ? `${h}h ${mn}m` : `${mn}m`;
-  return m > 0 ? { label:`+${s} Late`, type:"late" } : { label:`-${s} Early`, type:"early" };
+// FIX 1: Always format as HH:MM (not raw minutes)
+function fmtDiff(mins) {
+  if (mins === 0) return { label: "On Time", type: "ontime" };
+  const a = Math.abs(mins);
+  const h = Math.floor(a / 60);
+  const m = a % 60;
+  const hh = String(h).padStart(2, "0");
+  const mm = String(m).padStart(2, "0");
+  const str = `${hh}:${mm}`;
+  return mins > 0
+    ? { label: `+${str} Late`, type: "late" }
+    : { label: `-${str} Early`, type: "ontime" }; // FIX 3: Early = On Time
 }
 
 function parseCSVText(text) {
   const lines = text.split("\n").filter(Boolean);
   if (lines.length < 2) return [];
-  // Parse CSV properly (handles quoted fields)
   function parseLine(line) {
     const vals = []; let cur = "", inQ = false;
     for (let i = 0; i < line.length; i++) {
@@ -121,7 +123,6 @@ function parseCSVText(text) {
   }).filter(r => r.state && r.edition);
 }
 
-// ── Custom Range Picker ──────────────────────────────────────────
 function CustomRangePicker({ from, to, onChange }) {
   return (
     <span style={{ display:"flex", alignItems:"center", gap:5, flexWrap:"wrap" }}>
@@ -135,7 +136,6 @@ function CustomRangePicker({ from, to, onChange }) {
   );
 }
 
-// ── Main App ─────────────────────────────────────────────────────
 export default function App() {
   const [view, setView]           = useState("daily");
   const [selState, setSelState]   = useState("All");
@@ -155,7 +155,6 @@ export default function App() {
   const [syncError, setSyncError] = useState(false);
   const [tab, setTab]             = useState("report");
 
-  // ── Fetch from Google Sheet ──
   const fetchSheet = useCallback(async () => {
     setLoading(true); setSyncError(false);
     try {
@@ -163,18 +162,11 @@ export default function App() {
       if (!res.ok) throw new Error("Fetch failed");
       const text = await res.text();
       const rows = parseCSVText(text);
-      if (rows.length > 0) {
-        setData(rows);
-        setLastSync(new Date());
-      }
-    } catch {
-      setSyncError(true);
-    } finally {
-      setLoading(false);
-    }
+      if (rows.length > 0) { setData(rows); setLastSync(new Date()); }
+    } catch { setSyncError(true); }
+    finally { setLoading(false); }
   }, []);
 
-  // Fetch on mount + auto-refresh every 5 minutes
   useEffect(() => {
     fetchSheet();
     const interval = setInterval(fetchSheet, 5 * 60 * 1000);
@@ -192,68 +184,88 @@ export default function App() {
     if (useCustom && view !== "daily") {
       r = r.filter(x => x.date >= customFrom && x.date <= customTo);
     } else {
-      if (view==="daily")          r = r.filter(x=>x.date===date);
-      else if (view==="monthly")   r = r.filter(x=>x.month===month);
-      else if (view==="quarterly") r = r.filter(x=>QM[qtr].includes(x.month));
+      if (view==="daily")           r = r.filter(x=>x.date===date);
+      else if (view==="monthly")    r = r.filter(x=>x.month===month);
+      else if (view==="quarterly")  r = r.filter(x=>QM[qtr].includes(x.month));
       else if (view==="halfyearly") r = r.filter(x=>["January","February","March","April","May","June"].includes(x.month));
       // yearly = all data
     }
     if (selState!=="All") r = r.filter(x=>x.state===selState);
     if (branch!=="All")   r = r.filter(x=>x.branch===branch);
     if (drill)            r = r.filter(x=>x.state===drill);
+
     r = r.map(x=>{
       const rawDm = tdiff(x.stObj, x.rtObj);
-      // Daily view: always use actual time diff
-      // Monthly/Quarterly/Half-yearly/Yearly: if Delay/Ontime column marked as "ontime", treat as 0 (on time)
-      const markedOntime = x.delayOntime && 
+      const markedOntime = x.delayOntime &&
         x.delayOntime.trim().toLowerCase().replace(/[\s\/\-_]/g,"").includes("ontime");
-      const dm = (view !== "daily" && markedOntime) ? 0 : rawDm;
+      // FIX 3: Early = On Time, so treat negative dm as 0 (on time) always
+      const rawAfterMark = (view !== "daily" && markedOntime) ? 0 : rawDm;
+      const dm = rawAfterMark < 0 ? 0 : rawAfterMark; // Early = On Time
       return {...x, dm, rawDm};
     });
-    if (fstat==="Late")        r = r.filter(x=>x.dm>0);
-    else if (fstat==="Early")  r = r.filter(x=>x.dm<0);
-    else if (fstat==="OnTime") r = r.filter(x=>x.dm===0);
-    if (sort==="diff") {
-      r = [...r].sort((a,b)=>{
-        if (a.dm>0&&b.dm>0) return b.dm-a.dm;
-        if (a.dm<0&&b.dm<0) return a.dm-b.dm;
-        return b.dm-a.dm;
-      });
-    } else if (sort==="state")  r=[...r].sort((a,b)=>a.state.localeCompare(b.state));
-    else if (sort==="branch")   r=[...r].sort((a,b)=>a.branch.localeCompare(b.branch));
+
+    // FIX 2: Status filter — "Late" = dm>0, "On Time" = dm<=0 (includes early)
+    if (fstat==="Late")         r = r.filter(x=>x.dm>0);
+    else if (fstat==="OnTime")  r = r.filter(x=>x.dm===0);
+
+    if (sort==="diff")      r = [...r].sort((a,b)=>b.dm-a.dm);
+    else if (sort==="state") r = [...r].sort((a,b)=>a.state.localeCompare(b.state));
+    else if (sort==="branch") r = [...r].sort((a,b)=>a.branch.localeCompare(b.branch));
     return r;
   }, [data, view, date, month, qtr, useCustom, customFrom, customTo, selState, branch, drill, fstat, sort]);
 
   const kpi = useMemo(() => {
     const late = base.filter(r=>r.dm>0);
-    return { total:base.length, late:late.length, early:base.filter(r=>r.dm<0).length, ontime:base.filter(r=>r.dm===0).length,
-      avg: late.length ? Math.round(late.reduce((s,r)=>s+r.dm,0)/late.length) : 0 };
+    const ontime = base.filter(r=>r.dm===0);
+    return {
+      total: base.length,
+      late: late.length,
+      ontime: ontime.length,
+      avg: late.length ? Math.round(late.reduce((s,r)=>s+r.dm,0)/late.length) : 0
+    };
   }, [base]);
 
   const stStats = useMemo(() => {
     const m={};
     base.forEach(r=>{
-      if (!m[r.state]) m[r.state]={state:r.state,total:0,late:0,early:0,ontime:0};
+      if (!m[r.state]) m[r.state]={state:r.state,total:0,late:0,ontime:0};
       m[r.state].total++;
-      if (r.dm>0) m[r.state].late++; else if (r.dm<0) m[r.state].early++; else m[r.state].ontime++;
+      if (r.dm>0) m[r.state].late++; else m[r.state].ontime++;
     });
     return Object.values(m).sort((a,b)=>b.late-a.late);
   }, [base]);
 
-  const groupedTop10 = useMemo(() => {
+  // FIX 2: Top 10 Late — only dm>0 groups; Top 10 On Time — only dm===0 groups
+  const groupedLate = useMemo(() => {
     const map={};
-    base.forEach(r=>{
+    base.filter(r=>r.dm>0).forEach(r=>{
       const key=`${r.state}||${r.branch}||${r.edition}`;
-      if (!map[key]) map[key]={state:r.state,branch:r.branch,edition:r.edition,pullout:r.pullout,totalDm:0,count:0,causes:{}};
+      if (!map[key]) map[key]={state:r.state,branch:r.branch,edition:r.edition,totalDm:0,count:0,causes:{}};
       map[key].totalDm+=r.dm; map[key].count+=1;
       if (r.cause) map[key].causes[r.cause]=(map[key].causes[r.cause]||0)+1;
     });
-    return Object.values(map).map(g=>({...g, avgDm:Math.round(g.totalDm/g.count),
-      topCause:Object.entries(g.causes).sort((a,b)=>b[1]-a[1])[0]?.[0]||""}));
+    return Object.values(map)
+      .map(g=>({...g, avgDm:Math.round(g.totalDm/g.count),
+        topCause:Object.entries(g.causes).sort((a,b)=>b[1]-a[1])[0]?.[0]||""}))
+      .sort((a,b)=>b.avgDm-a.avgDm).slice(0,10);
   }, [base]);
 
-  const top10late  = useMemo(()=>[...groupedTop10].filter(r=>r.avgDm>0).sort((a,b)=>b.avgDm-a.avgDm).slice(0,10),[groupedTop10]);
-  const top10early = useMemo(()=>[...groupedTop10].filter(r=>r.avgDm<0).sort((a,b)=>a.avgDm-b.avgDm).slice(0,10),[groupedTop10]);
+  // FIX 2: Top 10 On Time — editions that are most consistently on time (lowest late count)
+  const groupedOntime = useMemo(() => {
+    const map={};
+    base.forEach(r=>{
+      const key=`${r.state}||${r.branch}||${r.edition}`;
+      if (!map[key]) map[key]={state:r.state,branch:r.branch,edition:r.edition,total:0,ontime:0,totalDm:0};
+      map[key].total+=1;
+      if (r.dm===0) map[key].ontime+=1;
+      else map[key].totalDm+=r.dm;
+    });
+    return Object.values(map)
+      .filter(g=>g.ontime>0)
+      .map(g=>({...g, ontimePct:Math.round(g.ontime/g.total*100)}))
+      .sort((a,b)=>b.ontimePct-a.ontimePct || b.ontime-a.ontime)
+      .slice(0,10);
+  }, [base]);
 
   const causes = useMemo(()=>{
     const m={};
@@ -263,8 +275,8 @@ export default function App() {
   }, [base]);
 
   const exportCSV = () => {
-    const h="Month,Date,State,Branch,Edition,Pullout,Schedule,Release,Diff,Cause";
-    const rows=base.map(r=>{const d=fmtD(r.dm);return[r.month,r.date,r.state,r.branch,r.edition,r.pullout,r.st,r.rt,d.label,r.cause].join(",");});
+    const h="Month,Date,State,Branch,Edition,Pullout,Schedule,Release,Delay/On Time,Reason,On Time-As per EHO";
+    const rows=base.map(r=>{const d=fmtDiff(r.dm);return[r.month,r.date,r.state,r.branch,r.edition,r.pullout,r.st,r.rt,d.label,r.cause,r.delayOntime].join(",");});
     const b=new Blob([[h,...rows].join("\n")],{type:"text/csv"});
     const u=URL.createObjectURL(b); const a=document.createElement("a"); a.href=u; a.download="edition_report.csv"; a.click();
   };
@@ -275,7 +287,6 @@ export default function App() {
 
   const sectionTabs=[["report","Full Report"],["states","State Overview"],["top10","Top 10 Lists"],["causes","Delay Analysis"]];
 
-  // ── Loading Screen ──
   if (loading && data.length === 0) {
     return (
       <div style={{minHeight:"100vh",background:"#f4f5f7",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -294,7 +305,7 @@ export default function App() {
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <div style={{maxWidth:980,margin:"0 auto",background:"#fff",borderRadius:14,padding:"20px 24px",boxShadow:"0 1px 4px rgba(0,0,0,.08)"}}>
 
-        {/* ── Header ── */}
+        {/* Header */}
         <div style={{borderBottom:"1px solid #eee",paddingBottom:14,marginBottom:18,display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
           <div>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
@@ -309,7 +320,6 @@ export default function App() {
             </div>
           </div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-            {/* Refresh button */}
             <button onClick={fetchSheet} disabled={loading} style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",border:"1px solid #185fa5",borderRadius:7,background:"#e6f1fb",color:"#185fa5",fontSize:12,cursor:"pointer"}}>
               <i className="ti ti-refresh" aria-hidden="true" style={{fontSize:14,animation:loading?"spin 1s linear infinite":"none"}}></i>
               {loading ? "Refreshing..." : "Refresh"}
@@ -324,7 +334,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* ── How to update banner ── */}
+        {/* Update banner */}
         {data.length > 0 && (
           <div style={{background:"#f0f7ea",border:"1px solid #97c459",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:12,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
             <i className="ti ti-info-circle" style={{fontSize:15,color:"#3b6d11"}}></i>
@@ -333,7 +343,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ── No Data ── */}
+        {/* No Data */}
         {data.length === 0 && !loading && (
           <div style={{textAlign:"center",padding:"48px 20px",color:"#aaa"}}>
             <i className="ti ti-table-off" style={{fontSize:52,display:"block",marginBottom:12}}></i>
@@ -341,21 +351,21 @@ export default function App() {
             <div style={{fontSize:13,marginBottom:16,color:"#aaa"}}>Add data to the Sheet with the correct column headers</div>
             <a href={`https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`} target="_blank" rel="noreferrer"
               style={{padding:"9px 22px",background:"#185fa5",color:"#fff",border:"none",borderRadius:8,fontSize:13,textDecoration:"none",display:"inline-block"}}>
-              Google Sheet Kholo
+              Open Google Sheet
             </a>
           </div>
         )}
 
         {data.length > 0 && (
           <>
-            {/* ── KPI Cards ── */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginBottom:18}}>
+            {/* KPI Cards — FIX 3: No "Early" card, only Late + On Time */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:18}}>
               {[
-                {l:"Total Editions",v:kpi.total,    ic:"ti-layout-grid",       bg:"#f5f5f5",c:"#333"},
-                {l:"Late",          v:kpi.late,      ic:"ti-clock-exclamation", bg:"#fff0f0",c:"#a32d2d"},
-                {l:"On Time",       v:kpi.ontime,    ic:"ti-circle-check",      bg:"#e6f1fb",c:"#185fa5"},
-                {l:"Early Release", v:kpi.early,     ic:"ti-bolt",              bg:"#eaf3de",c:"#3b6d11"},
-                {l:"Avg Delay",     v:`${kpi.avg}m`, ic:"ti-trending-up",       bg:"#faeeda",c:"#854f0b"},
+                {l:"Total Editions", v:kpi.total,    ic:"ti-layout-grid",       bg:"#f5f5f5",c:"#333"},
+                {l:"Late",           v:kpi.late,      ic:"ti-clock-exclamation", bg:"#fff0f0",c:"#a32d2d"},
+                {l:"On Time",        v:kpi.ontime,    ic:"ti-circle-check",      bg:"#e6f1fb",c:"#185fa5"},
+                {l:"Avg Delay",      v:(() => { const m=kpi.avg; const h=Math.floor(m/60); const mn=m%60; return h>0?`${String(h).padStart(2,"0")}:${String(mn).padStart(2,"0")}`:`00:${String(mn).padStart(2,"0")}`; })(),
+                  ic:"ti-trending-up", bg:"#faeeda",c:"#854f0b"},
               ].map(k=>(
                 <div key={k.l} style={{background:k.bg,borderRadius:9,padding:"11px 13px"}}>
                   <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
@@ -367,7 +377,7 @@ export default function App() {
               ))}
             </div>
 
-            {/* ── View Pills ── */}
+            {/* View Pills */}
             <div style={{display:"flex",gap:5,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
               {[["daily","Daily"],["monthly","Monthly"],["quarterly","Quarterly"],["halfyearly","Half-Yearly"],["yearly","Yearly"]].map(([k,l])=>(
                 <Pill key={k} label={l} active={view===k} onClick={()=>{setView(k);setDrill(null);setUseCustom(false);}}/>
@@ -381,7 +391,7 @@ export default function App() {
               )}
             </div>
 
-            {/* ── Filters ── */}
+            {/* Filters */}
             <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14,padding:"10px 12px",background:"#f8f9fa",borderRadius:9,alignItems:"center"}}>
               <i className="ti ti-adjustments-horizontal" aria-hidden="true" style={{fontSize:15,color:"#aaa"}}></i>
               {view==="daily" && (
@@ -415,7 +425,7 @@ export default function App() {
               {[
                 {lbl:"State",val:selState,opts:states,set:(v)=>{setSelState(v);setBranch("All");setDrill(null);}},
                 {lbl:"Branch",val:branch,opts:branches,set:setBranch},
-                {lbl:"Status",val:fstat,opts:["All","Late","OnTime","Early"],set:setFstat},
+                {lbl:"Status",val:fstat,opts:["All","Late","OnTime"],set:setFstat},
               ].map(f=>(
                 <span key={f.lbl} style={{display:"flex",alignItems:"center",gap:5}}>
                   <label style={{fontSize:11,color:"#888"}}>{f.lbl}</label>
@@ -441,14 +451,14 @@ export default function App() {
               )}
             </div>
 
-            {/* ── Section Tabs ── */}
+            {/* Section Tabs */}
             <div style={{display:"flex",marginBottom:16,borderBottom:"1px solid #eee"}}>
               {sectionTabs.map(([k,l])=>(
                 <button key={k} onClick={()=>setTab(k)} style={{padding:"7px 15px",fontSize:12,border:"none",background:"transparent",cursor:"pointer",color:tab===k?"#185fa5":"#888",borderBottom:tab===k?"2px solid #185fa5":"2px solid transparent",fontWeight:tab===k?500:400}}>{l}</button>
               ))}
             </div>
 
-            {/* ── TAB: Full Report ── */}
+            {/* TAB: Full Report */}
             {tab==="report"&&(
               <div>
                 <div style={{fontSize:12,color:"#888",marginBottom:8}}>
@@ -467,7 +477,7 @@ export default function App() {
                     <tbody>
                       {base.length===0&&<tr><td colSpan={9} style={{padding:24,textAlign:"center",color:"#aaa"}}>No data for this selection.</td></tr>}
                       {base.map((r,i)=>{
-                        const d=fmtD(r.dm); const sc=SC[d.type];
+                        const d=fmtDiff(r.dm); const sc=SC[d.type];
                         return (
                           <tr key={i} style={{borderBottom:"1px solid #f0f0f0",background:i%2?"#fafafa":"#fff"}}>
                             <td style={{padding:"7px 10px",fontWeight:500}}>{r.state}</td>
@@ -481,13 +491,9 @@ export default function App() {
                             </td>
                             <td style={{padding:"7px 10px",color:r.cause?"#854f0b":"#ccc",fontSize:11}}>{r.cause||"—"}</td>
                             <td style={{padding:"7px 10px",fontSize:11}}>
-                              {r.delayOntime ? (
-                                <span style={{
-                                  background: r.delayOntime.trim().toLowerCase().replace(/[\s\/\-_]/g,"").includes("ontime") ? "#e6f1fb" : "#fff0f0",
-                                  color: r.delayOntime.trim().toLowerCase().replace(/[\s\/\-_]/g,"").includes("ontime") ? "#185fa5" : "#a32d2d",
-                                  padding:"2px 7px", borderRadius:8, fontSize:10, fontWeight:500
-                                }}>{r.delayOntime}</span>
-                              ) : <span style={{color:"#ccc"}}>—</span>}
+                              {r.delayOntime
+                                ? <span style={{background:"#e6f1fb",color:"#185fa5",padding:"2px 7px",borderRadius:8,fontSize:10,fontWeight:500}}>{r.delayOntime}</span>
+                                : <span style={{color:"#ccc"}}>—</span>}
                             </td>
                           </tr>
                         );
@@ -498,7 +504,7 @@ export default function App() {
               </div>
             )}
 
-            {/* ── TAB: State Overview ── */}
+            {/* TAB: State Overview */}
             {tab==="states"&&(
               <div>
                 <div style={{fontSize:12,color:"#888",marginBottom:12}}>Click on a state card to drill down into its editions</div>
@@ -509,7 +515,6 @@ export default function App() {
                       <div style={{fontSize:12,color:"#888",marginBottom:8}}>{s.total} editions</div>
                       <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
                         <span style={{fontSize:10,background:"#fff0f0",color:"#a32d2d",padding:"2px 6px",borderRadius:8}}>{s.late} late</span>
-                        <span style={{fontSize:10,background:"#eaf3de",color:"#3b6d11",padding:"2px 6px",borderRadius:8}}>{s.early} early</span>
                         <span style={{fontSize:10,background:"#e6f1fb",color:"#185fa5",padding:"2px 6px",borderRadius:8}}>{s.ontime} on-time</span>
                       </div>
                       {s.total>0&&(
@@ -526,49 +531,56 @@ export default function App() {
               </div>
             )}
 
-            {/* ── TAB: Top 10 ── */}
+            {/* TAB: Top 10 */}
             {tab==="top10"&&(
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+                {/* Top 10 Late */}
                 <div style={{border:"1px solid #f09595",borderRadius:10,padding:14}}>
                   <div style={{fontSize:13,fontWeight:500,color:"#a32d2d",marginBottom:4,display:"flex",alignItems:"center",gap:6}}>
                     <i className="ti ti-alert-triangle" aria-hidden="true" style={{fontSize:15}}></i> Top 10 Late Editions
                   </div>
-                  <div style={{fontSize:11,color:"#aaa",marginBottom:12}}>Avg delay · High → Low</div>
-                  {top10late.length===0&&<div style={{fontSize:12,color:"#aaa"}}>No late editions</div>}
-                  {top10late.map((r,i)=>(
-                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,paddingBottom:10,borderBottom:i<top10late.length-1?"1px solid #fef0f0":"none"}}>
-                      <span style={{fontSize:12,fontWeight:700,color:"#a32d2d",minWidth:24,textAlign:"right"}}>#{i+1}</span>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:12,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.branch} — {r.edition}</div>
-                        <div style={{fontSize:11,color:"#888"}}>{r.state}{r.topCause?" · "+r.topCause:""}</div>
-                        <div style={{fontSize:10,color:"#bbb"}}>{r.count} days of data</div>
+                  <div style={{fontSize:11,color:"#aaa",marginBottom:12}}>Avg delay · High → Low (HH:MM format)</div>
+                  {groupedLate.length===0&&<div style={{fontSize:12,color:"#aaa"}}>No late editions in this selection</div>}
+                  {groupedLate.map((r,i)=>{
+                    const h=Math.floor(r.avgDm/60), m=r.avgDm%60;
+                    const timeStr=`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+                    return (
+                      <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,paddingBottom:10,borderBottom:i<groupedLate.length-1?"1px solid #fef0f0":"none"}}>
+                        <span style={{fontSize:12,fontWeight:700,color:"#a32d2d",minWidth:24,textAlign:"right"}}>#{i+1}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:12,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.branch} — {r.edition}</div>
+                          <div style={{fontSize:11,color:"#888"}}>{r.state}{r.topCause?" · "+r.topCause:""}</div>
+                          <div style={{fontSize:10,color:"#bbb"}}>{r.count} days of data</div>
+                        </div>
+                        <span style={{fontSize:11,background:"#fff0f0",color:"#a32d2d",padding:"3px 9px",borderRadius:8,fontWeight:700,whiteSpace:"nowrap"}}>+{timeStr}</span>
                       </div>
-                      <span style={{fontSize:11,background:"#fff0f0",color:"#a32d2d",padding:"3px 9px",borderRadius:8,fontWeight:700,whiteSpace:"nowrap"}}>+{r.avgDm}m</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
-                <div style={{border:"1px solid #97c459",borderRadius:10,padding:14}}>
-                  <div style={{fontSize:13,fontWeight:500,color:"#3b6d11",marginBottom:4,display:"flex",alignItems:"center",gap:6}}>
-                    <i className="ti ti-award" aria-hidden="true" style={{fontSize:15}}></i> Top 10 Early Editions
+
+                {/* Top 10 On Time */}
+                <div style={{border:"1px solid #85b7eb",borderRadius:10,padding:14}}>
+                  <div style={{fontSize:13,fontWeight:500,color:"#185fa5",marginBottom:4,display:"flex",alignItems:"center",gap:6}}>
+                    <i className="ti ti-circle-check" aria-hidden="true" style={{fontSize:15}}></i> Top 10 On Time Editions
                   </div>
-                  <div style={{fontSize:11,color:"#aaa",marginBottom:12}}>Avg early · High → Low</div>
-                  {top10early.length===0&&<div style={{fontSize:12,color:"#aaa"}}>No early editions</div>}
-                  {top10early.map((r,i)=>(
-                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,paddingBottom:10,borderBottom:i<top10early.length-1?"1px solid #f0f7ea":"none"}}>
-                      <span style={{fontSize:12,fontWeight:700,color:"#3b6d11",minWidth:24,textAlign:"right"}}>#{i+1}</span>
+                  <div style={{fontSize:11,color:"#aaa",marginBottom:12}}>Most consistently on time · High % first</div>
+                  {groupedOntime.length===0&&<div style={{fontSize:12,color:"#aaa"}}>No on-time editions in this selection</div>}
+                  {groupedOntime.map((r,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,paddingBottom:10,borderBottom:i<groupedOntime.length-1?"1px solid #e6f1fb":"none"}}>
+                      <span style={{fontSize:12,fontWeight:700,color:"#185fa5",minWidth:24,textAlign:"right"}}>#{i+1}</span>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:12,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.branch} — {r.edition}</div>
                         <div style={{fontSize:11,color:"#888"}}>{r.state}</div>
-                        <div style={{fontSize:10,color:"#bbb"}}>{r.count} days of data</div>
+                        <div style={{fontSize:10,color:"#bbb"}}>{r.ontime}/{r.total} days on time</div>
                       </div>
-                      <span style={{fontSize:11,background:"#eaf3de",color:"#3b6d11",padding:"3px 9px",borderRadius:8,fontWeight:700,whiteSpace:"nowrap"}}>{fmtD(r.avgDm).label}</span>
+                      <span style={{fontSize:11,background:"#e6f1fb",color:"#185fa5",padding:"3px 9px",borderRadius:8,fontWeight:700,whiteSpace:"nowrap"}}>{r.ontimePct}%</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* ── TAB: Delay Causes ── */}
+            {/* TAB: Delay Causes */}
             {tab==="causes"&&(
               <div>
                 <div style={{fontSize:12,color:"#888",marginBottom:12}}>Delay cause breakdown for current filter selection</div>
