@@ -12,25 +12,31 @@ const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
 const EMAILJS_PUBLIC_KEY  = "YOUR_PUBLIC_KEY";
 
 // ── Edition Categories ───────────────────────────────────────────
-const EDITION_CATEGORY = {
+// Priority: exact edition match first, then branch match
+// Edition-level overrides (more specific)
+const EDITION_EXACT = {
+  "RP-JAI-JAIPUR CITY": "A+",
+};
+
+// Branch-level defaults
+const BRANCH_CATEGORY = {
   // Rajasthan
-  "Jaipur": "A+",
+  "Jaipur": "C",       // All Jaipur editions are C except JAIPUR CITY (overridden above)
   "Jodhpur": "B+", "Kota": "B+", "Udaipur": "B+",
   "Alwar": "B", "Jhunjhunu": "B", "Sikar": "B", "Ajmer": "B",
-  "Bikaner": "B", "Bhilwara": "B", "Bhilai": "B", "Pali": "B",
-  "Sriganganagar": "B", "Nagaur": "B",
-  "Bharatpur": "C", "Banswara": "C", "Jaipur Regional": "C",
-  "Barmer": "C", "Morning Jaipur": "C",
+  "Bikaner": "B", "Bhilwara": "B", "Pali": "B",
+  "Sriganganagar": "C", "Nagaur": "B",  // Fix: Ganganagar = C
+  "Bharatpur": "C", "Banswara": "C", "Barmer": "C",
   // Madhya Pradesh
   "Indore": "A", "Bhopal": "A",
   "Jabalpur": "B+",
   "Gwalior": "B", "Ujjain": "B", "Sagar": "B",
   "Chhindwara": "C", "Narmadapuram": "C", "Satna": "C",
-  "Ratlam": "C", "Khandwa": "C", "Morning Indore": "C",
+  "Ratlam": "C", "Khandwa": "C",
   "Shahdol": "D",
   // Chhattisgarh
   "Raipur": "A",
-  "Bilaspur": "B",
+  "Bilaspur": "B", "Bhilai": "B",
   "Jagdalpur": "D",
   // Metro
   "Bengaluru": "C", "Surat": "C",
@@ -78,9 +84,18 @@ function fmtDiff(mins){
   return mins>0?{label:`+${str} Late`,type:"late"}:{label:`On Time`,type:"ontime"};
 }
 function getCategory(branch, edition) {
-  for(const [key, cat] of Object.entries(EDITION_CATEGORY)){
-    if(branch && branch.toLowerCase().includes(key.toLowerCase())) return cat;
-    if(edition && edition.toLowerCase().includes(key.toLowerCase())) return cat;
+  // 1. Check exact edition match first (highest priority)
+  if(edition) {
+    const edUpper = edition.trim().toUpperCase();
+    for(const [key, cat] of Object.entries(EDITION_EXACT)){
+      if(edUpper === key.toUpperCase()) return cat;
+    }
+  }
+  // 2. Check branch match
+  if(branch) {
+    for(const [key, cat] of Object.entries(BRANCH_CATEGORY)){
+      if(branch.toLowerCase().includes(key.toLowerCase())) return cat;
+    }
   }
   return "—";
 }
@@ -208,6 +223,7 @@ export default function App(){
   const [syncError,setSyncError]=useState(false);
   const [tab,setTab]=useState("overview");
   const [noticeRecord,setNoticeRecord]=useState(null);
+  const [selectedCat,setSelectedCat]=useState(null);
 
   const fetchSheet=useCallback(async()=>{
     setLoading(true); setSyncError(false);
@@ -461,13 +477,15 @@ export default function App(){
               {/* Category Analysis */}
               <div style={{marginBottom:24}}>
                 <div style={{fontSize:15,fontWeight:600,color:"#111",marginBottom:4}}>Category-wise Performance Analysis</div>
-                <div style={{fontSize:12,color:"#888",marginBottom:16}}>Edition performance breakdown by circulation category — A+ to D</div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
+                <div style={{fontSize:12,color:"#888",marginBottom:16}}>Click on any category card to see all editions in that category — sorted by highest delay first</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:16}}>
                   {catStats.map(c=>{
                     const col=CAT_COLORS[c.cat]||CAT_COLORS["D"];
                     const h=Math.floor(c.avgDelay/60),m=c.avgDelay%60;
+                    const isSelected=selectedCat===c.cat;
                     return(
-                      <div key={c.cat} style={{background:col.bg,border:`1.5px solid ${col.border}`,borderRadius:12,padding:"14px 16px"}}>
+                      <button key={c.cat} onClick={()=>setSelectedCat(isSelected?null:c.cat)}
+                        style={{background:col.bg,border:`${isSelected?"3px":"1.5px"} solid ${isSelected?col.color:col.border}`,borderRadius:12,padding:"14px 16px",cursor:"pointer",textAlign:"left",boxShadow:isSelected?`0 4px 16px ${col.bar}44`:"none",transition:"all .2s"}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                           <span style={{fontSize:22,fontWeight:800,color:col.color}}>{c.cat}</span>
                           <span style={{fontSize:10,background:col.color,color:"#fff",padding:"2px 8px",borderRadius:20,fontWeight:600}}>{c.delayRate}% delay</span>
@@ -477,10 +495,65 @@ export default function App(){
                         <div style={{fontSize:12,color:"#1b5e20",marginBottom:8}}><b>{c.ontime}</b> on time</div>
                         <MiniBar value={c.late} max={maxLate} color={col.bar}/>
                         {c.avgDelay>0&&<div style={{fontSize:11,color:col.color,marginTop:6,fontWeight:500}}>Avg delay: {h>0?`${h}h ${m}m`:`${m}m`}</div>}
-                      </div>
+                        {isSelected&&<div style={{fontSize:10,color:col.color,marginTop:4,fontWeight:600}}>▼ Click to collapse</div>}
+                      </button>
                     );
                   })}
                 </div>
+
+                {/* Category Drill-down Table */}
+                {selectedCat&&(()=>{
+                  const col=CAT_COLORS[selectedCat]||CAT_COLORS["D"];
+                  const catEditions=[...base].filter(r=>r.category===selectedCat).sort((a,b)=>b.dm-a.dm);
+                  return(
+                    <div style={{border:`2px solid ${col.border}`,borderRadius:12,padding:16,background:col.bg,marginBottom:8}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                        <div>
+                          <span style={{fontSize:14,fontWeight:700,color:col.color}}>Category {selectedCat} — All Editions</span>
+                          <span style={{fontSize:12,color:"#888",marginLeft:10}}>{catEditions.length} editions · sorted by delay (highest first)</span>
+                        </div>
+                        <button onClick={()=>setSelectedCat(null)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"#888",lineHeight:1}}>×</button>
+                      </div>
+                      <div style={{overflowX:"auto",borderRadius:8,border:"1px solid #eee",background:"#fff"}}>
+                        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                          <thead>
+                            <tr style={{background:"#f8f9fa"}}>
+                              {["#","State","Branch","Edition","Scheduled","Released","Delay/On Time","Reason","Notice"].map(h=>(
+                                <th key={h} style={{padding:"8px 10px",textAlign:"left",fontWeight:600,color:"#555",borderBottom:"2px solid #eee",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {catEditions.length===0&&<tr><td colSpan={9} style={{padding:16,textAlign:"center",color:"#aaa"}}>No editions in this category for current filter.</td></tr>}
+                            {catEditions.map((r,i)=>{
+                              const d=fmtDiff(r.dm); const sc=SC[d.type];
+                              return(
+                                <tr key={i} style={{borderBottom:"1px solid #f0f0f0",background:i%2?"#fafafa":"#fff"}}>
+                                  <td style={{padding:"7px 10px",fontWeight:600,color:col.color,fontSize:11}}>#{i+1}</td>
+                                  <td style={{padding:"7px 10px",fontWeight:500}}>{r.state}</td>
+                                  <td style={{padding:"7px 10px",color:"#555"}}>{r.branch}</td>
+                                  <td style={{padding:"7px 10px",fontWeight:500}}>{r.edition}</td>
+                                  <td style={{padding:"7px 10px",fontFamily:"monospace",fontSize:11}}>{r.st}</td>
+                                  <td style={{padding:"7px 10px",fontFamily:"monospace",fontSize:11}}>{r.rt}</td>
+                                  <td style={{padding:"7px 10px"}}>
+                                    <span style={{background:sc.bg,color:sc.color,border:`1px solid ${sc.bd}`,borderRadius:8,fontSize:10,padding:"3px 8px",fontWeight:600,whiteSpace:"nowrap"}}>{d.label}</span>
+                                  </td>
+                                  <td style={{padding:"7px 10px",color:r.cause?"#854f0b":"#ccc",fontSize:11,maxWidth:200,wordBreak:"break-word",whiteSpace:"pre-wrap",lineHeight:1.4}}>{r.cause||"—"}</td>
+                                  <td style={{padding:"7px 10px"}}>
+                                    {r.dm>0&&<button onClick={()=>setNoticeRecord(r)}
+                                      style={{display:"flex",alignItems:"center",gap:4,padding:"4px 8px",background:"#fff3e0",border:"1px solid #ffb74d",borderRadius:6,color:"#e65100",fontSize:10,cursor:"pointer",fontWeight:500,whiteSpace:"nowrap"}}>
+                                      <i className="ti ti-send" style={{fontSize:11}}></i> Notice
+                                    </button>}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Director Summary */}
@@ -578,7 +651,7 @@ export default function App(){
                             <td style={{padding:"7px 10px",fontSize:11}}>
                               {isOntime?<span style={{background:"#e6f1fb",color:"#185fa5",padding:"2px 7px",borderRadius:8,fontSize:10,fontWeight:500}}>On Time</span>:<span style={{color:"#ccc"}}>—</span>}
                             </td>
-                            <td style={{padding:"7px 10px",color:r.cause?"#854f0b":"#ccc",fontSize:11,maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.cause||"—"}</td>
+                            <td style={{padding:"7px 10px",color:r.cause?"#854f0b":"#ccc",fontSize:11,maxWidth:220,wordBreak:"break-word",whiteSpace:"pre-wrap",lineHeight:1.4}}>{r.cause||"—"}</td>
                             <td style={{padding:"7px 10px"}}>
                               {r.dm>0&&<button onClick={()=>setNoticeRecord(r)}
                                 style={{display:"flex",alignItems:"center",gap:4,padding:"4px 8px",background:"#fff3e0",border:"1px solid #ffb74d",borderRadius:6,color:"#e65100",fontSize:10,cursor:"pointer",fontWeight:500,whiteSpace:"nowrap"}}>
