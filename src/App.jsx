@@ -6,6 +6,20 @@ const SHEET_NAME = "Sheet1";
 const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAME}`;
 const SENDER_EMAIL = "bhuwan.jain@in.patrika.com";
 
+// ── Login Config ─────────────────────────────────────────────────
+const USERS = [
+  { username: "Admin",  password: "Admin@2024", role: "admin", label: "Admin",      states: null },
+  { username: "Raj",    password: "Raj@2024",   role: "state", label: "Rajasthan",  states: ["Rajasthan","Raj"] },
+  { username: "MP",     password: "MP@2024",    role: "state", label: "Madhya Pradesh", states: ["MP","Madhya Pradesh"] },
+  { username: "CG",     password: "CG@2024",    role: "state", label: "Chhattisgarh", states: ["CG","Chhattisgarh"] },
+  { username: "Metro",  password: "Metro@2024", role: "state", label: "Metro",      states: ["Metro"] },
+];
+
+function matchesUserState(recordState, userStates) {
+  if (!userStates) return true;
+  return userStates.some(s => (recordState||"").toLowerCase().includes(s.toLowerCase()));
+}
+
 // ── EmailJS Config (fill your keys) ─────────────────────────────
 const EMAILJS_SERVICE_ID  = "YOUR_SERVICE_ID";
 const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
@@ -123,6 +137,78 @@ function parseCSVText(text) {
   }).filter(r=>r.state&&r.edition);
 }
 
+// ── Login Screen ─────────────────────────────────────────────────
+function LoginScreen({ onLogin }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [showPass, setShowPass] = useState(false);
+
+  const handleLogin = () => {
+    const user = USERS.find(u => u.username.toLowerCase() === username.trim().toLowerCase() && u.password === password.trim());
+    if (user) { onLogin(user); }
+    else { setError("Invalid username or password. Please try again."); }
+  };
+
+  return (
+    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#1a237e 0%,#185fa5 60%,#0288d1 100%)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{background:"#fff",borderRadius:20,padding:"40px 36px",maxWidth:400,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+        {/* Logo/Header */}
+        <div style={{textAlign:"center",marginBottom:32}}>
+          <div style={{width:64,height:64,background:"linear-gradient(135deg,#1a237e,#185fa5)",borderRadius:16,margin:"0 auto 16px",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <i className="ti ti-news" style={{fontSize:32,color:"#fff"}}></i>
+          </div>
+          <div style={{fontSize:22,fontWeight:700,color:"#1a237e",marginBottom:4}}>Edition Release Tracker</div>
+          <div style={{fontSize:13,color:"#888"}}>Print Media Operations Dashboard</div>
+        </div>
+
+        {/* Form */}
+        <div style={{marginBottom:16}}>
+          <label style={{fontSize:12,fontWeight:600,color:"#555",display:"block",marginBottom:6}}>Username</label>
+          <input
+            type="text" value={username} onChange={e=>{setUsername(e.target.value);setError("");}}
+            onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+            placeholder="Enter username"
+            style={{width:"100%",padding:"10px 14px",border:"1.5px solid #e0e0e0",borderRadius:10,fontSize:14,outline:"none",transition:"border .2s"}}
+          />
+        </div>
+        <div style={{marginBottom:20}}>
+          <label style={{fontSize:12,fontWeight:600,color:"#555",display:"block",marginBottom:6}}>Password</label>
+          <div style={{position:"relative"}}>
+            <input
+              type={showPass?"text":"password"} value={password} onChange={e=>{setPassword(e.target.value);setError("");}}
+              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+              placeholder="Enter password"
+              style={{width:"100%",padding:"10px 14px",border:"1.5px solid #e0e0e0",borderRadius:10,fontSize:14,outline:"none",paddingRight:44}}
+            />
+            <button onClick={()=>setShowPass(p=>!p)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#aaa",fontSize:16}}>
+              <i className={`ti ${showPass?"ti-eye-off":"ti-eye"}`}></i>
+            </button>
+          </div>
+        </div>
+
+        {error && <div style={{background:"#fff0f0",border:"1px solid #f09595",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#a32d2d",marginBottom:16}}>{error}</div>}
+
+        <button onClick={handleLogin}
+          style={{width:"100%",padding:"12px",background:"linear-gradient(135deg,#1a237e,#185fa5)",color:"#fff",border:"none",borderRadius:10,fontSize:15,fontWeight:600,cursor:"pointer",letterSpacing:"0.3px"}}>
+          Sign In
+        </button>
+
+        {/* Hint */}
+        <div style={{marginTop:20,padding:"12px 14px",background:"#f8f9fa",borderRadius:10,fontSize:11,color:"#888"}}>
+          <div style={{fontWeight:600,marginBottom:6,color:"#555"}}>Available Logins:</div>
+          {USERS.map(u=>(
+            <div key={u.username} style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
+              <span style={{fontWeight:500,color:"#333"}}>{u.username}</span>
+              <span style={{color:"#aaa"}}>{u.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CustomRangePicker({from,to,onChange}){
   return(<span style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
     <label style={{fontSize:11,color:"#888"}}>From</label>
@@ -224,6 +310,7 @@ export default function App(){
   const [tab,setTab]=useState("overview");
   const [noticeRecord,setNoticeRecord]=useState(null);
   const [selectedCat,setSelectedCat]=useState(null);
+  const [currentUser,setCurrentUser]=useState(null);
 
   const fetchSheet=useCallback(async()=>{
     setLoading(true); setSyncError(false);
@@ -240,10 +327,10 @@ export default function App(){
   useEffect(()=>{fetchSheet(); const iv=setInterval(fetchSheet,5*60*1000); return()=>clearInterval(iv);},[fetchSheet]);
 
   const states=useMemo(()=>["All",...new Set(data.map(d=>d.state))],[data]);
-  const branches=useMemo(()=>{const b=data.filter(d=>selState==="All"||d.state===selState); return["All",...new Set(b.map(d=>d.branch))];},[data,selState]);
+  const branches=useMemo(()=>{const b=userData.filter(d=>selState==="All"||d.state===selState); return["All",...new Set(b.map(d=>d.branch))];},[userData,selState]);
 
   const base=useMemo(()=>{
-    let r=data;
+    let r=userData;
     if(useCustom&&view!=="daily"){r=r.filter(x=>x.date>=customFrom&&x.date<=customTo);}
     else{
       if(view==="daily")r=r.filter(x=>x.date===date);
@@ -267,7 +354,7 @@ export default function App(){
     else if(sort==="state")r=[...r].sort((a,b)=>a.state.localeCompare(b.state));
     else r=[...r].sort((a,b)=>a.branch.localeCompare(b.branch));
     return r;
-  },[data,view,date,month,qtr,useCustom,customFrom,customTo,selState,branch,drill,fstat,sort]);
+  },[userData,view,date,month,qtr,useCustom,customFrom,customTo,selState,branch,drill,fstat,sort]);
 
   const kpi=useMemo(()=>{
     const late=base.filter(r=>r.dm>0);
@@ -344,6 +431,9 @@ export default function App(){
 
   const maxLate=Math.max(...catStats.map(c=>c.late),1);
 
+  // Show login screen if not authenticated
+  if(!currentUser){return <LoginScreen onLogin={(user)=>setCurrentUser(user)}/>;}
+
   if(loading&&data.length===0){return(
     <div style={{minHeight:"100vh",background:"#f0f4f8",display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{textAlign:"center",padding:40}}>
@@ -371,21 +461,29 @@ export default function App(){
               <span style={{background:"rgba(255,255,255,0.2)",fontSize:10,padding:"2px 10px",borderRadius:10,fontWeight:600,backdropFilter:"blur(4px)"}}>LIVE</span>
             </div>
             <div style={{fontSize:12,opacity:.8,display:"flex",gap:12,flexWrap:"wrap"}}>
-              <span>📊 {data.length.toLocaleString()} records</span>
+              <span>📊 {userData.length.toLocaleString()} records{currentUser.role!=="admin"?` · ${currentUser.label}`:""}</span>
               {lastSync&&<span>🔄 Last sync: {lastSync.toLocaleTimeString()}</span>}
               {syncError&&<span style={{color:"#ffcdd2"}}>⚠️ Sync error</span>}
             </div>
           </div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",background:"rgba(255,255,255,0.15)",borderRadius:8,backdropFilter:"blur(4px)"}}>
+              <i className="ti ti-user-circle" style={{fontSize:16,color:"#fff"}}></i>
+              <span style={{fontSize:12,color:"#fff",fontWeight:500}}>{currentUser.label}</span>
+              {currentUser.role==="admin"&&<span style={{fontSize:9,background:"#ffd54f",color:"#333",padding:"1px 6px",borderRadius:6,fontWeight:700,marginLeft:2}}>ADMIN</span>}
+            </div>
             <button onClick={fetchSheet} disabled={loading} style={{display:"flex",alignItems:"center",gap:5,padding:"7px 14px",border:"1px solid rgba(255,255,255,0.4)",borderRadius:8,background:"rgba(255,255,255,0.15)",color:"#fff",fontSize:12,cursor:"pointer",backdropFilter:"blur(4px)"}}>
               <i className="ti ti-refresh" style={{fontSize:14,animation:loading?"spin 1s linear infinite":"none"}}></i> {loading?"Refreshing...":"Refresh"}
             </button>
-            <a href={`https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`} target="_blank" rel="noreferrer"
+            {currentUser.role==="admin"&&<a href={`https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`} target="_blank" rel="noreferrer"
               style={{display:"flex",alignItems:"center",gap:5,padding:"7px 14px",border:"1px solid rgba(255,255,255,0.4)",borderRadius:8,background:"rgba(255,255,255,0.15)",color:"#fff",fontSize:12,textDecoration:"none",backdropFilter:"blur(4px)"}}>
               <i className="ti ti-table" style={{fontSize:14}}></i> Edit Sheet
-            </a>
+            </a>}
             <button onClick={exportCSV} style={{display:"flex",alignItems:"center",gap:5,padding:"7px 14px",border:"1px solid rgba(255,255,255,0.4)",borderRadius:8,background:"rgba(255,255,255,0.15)",color:"#fff",fontSize:12,cursor:"pointer",backdropFilter:"blur(4px)"}}>
               <i className="ti ti-download" style={{fontSize:14}}></i> Export
+            </button>
+            <button onClick={()=>{setCurrentUser(null);setDrill(null);setSelectedCat(null);}} style={{display:"flex",alignItems:"center",gap:5,padding:"7px 14px",border:"1px solid rgba(255,255,255,0.4)",borderRadius:8,background:"rgba(255,255,255,0.08)",color:"rgba(255,255,255,0.9)",fontSize:12,cursor:"pointer",backdropFilter:"blur(4px)"}}>
+              <i className="ti ti-logout" style={{fontSize:14}}></i> Logout
             </button>
           </div>
         </div>
@@ -790,7 +888,7 @@ export default function App(){
           </div>
 
           <div style={{marginTop:16,fontSize:11,color:"#aaa",textAlign:"center"}}>
-            Print Media Operations · Edition Release Tracker · {data.length.toLocaleString()} records · Powered by Google Sheets
+            Print Media Operations · Edition Release Tracker · {userData.length.toLocaleString()} records · Powered by Google Sheets
           </div>
         </>)}
       </div>
