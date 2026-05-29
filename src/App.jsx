@@ -25,7 +25,7 @@ const BRANCH_CATEGORY = {
   "Jodhpur": "B+", "Kota": "B+", "Udaipur": "B+",
   "Alwar": "B", "Jhunjhunu": "B", "Sikar": "B", "Ajmer": "B",
   "Bikaner": "B", "Bhilwara": "B", "Pali": "B",
-  "Sriganganagar": "C", "Nagaur": "B",  // Fix: Ganganagar = C
+  "Sriganganagar": "C", "Ganganagar": "B", "Nagaur": "B",  // Fix: Ganganagar = C
   "Bharatpur": "C", "Banswara": "C", "Barmer": "C",
   // Madhya Pradesh
   "Indore": "A", "Bhopal": "A",
@@ -505,52 +505,82 @@ export default function App(){
                 {selectedCat&&(()=>{
                   const col=CAT_COLORS[selectedCat]||CAT_COLORS["D"];
                   const catEditions=[...base].filter(r=>r.category===selectedCat).sort((a,b)=>b.dm-a.dm);
+                  // Group by state, within each group sort by delay desc
+                  const STATE_ORDER=["Rajasthan","Raj","MP","Madhya Pradesh","CG","Chhattisgarh","Metro"];
+                  const grouped={};
+                  catEditions.forEach(r=>{
+                    const s=r.state||"Other";
+                    if(!grouped[s])grouped[s]=[];
+                    grouped[s].push(r);
+                  });
+                  // Sort state groups: Raj first, then MP, CG, Metro, others
+                  const stateOrder=["Rajasthan","Raj","Madhya Pradesh","MP","Chhattisgarh","CG","Metro"];
+                  const sortedStates=Object.keys(grouped).sort((a,b)=>{
+                    const ai=stateOrder.findIndex(s=>a.toLowerCase().includes(s.toLowerCase()));
+                    const bi=stateOrder.findIndex(s=>b.toLowerCase().includes(s.toLowerCase()));
+                    const an=ai===-1?99:ai, bn=bi===-1?99:bi;
+                    return an-bn;
+                  });
+                  let globalIdx=0;
                   return(
                     <div style={{border:`2px solid ${col.border}`,borderRadius:12,padding:16,background:col.bg,marginBottom:8}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
                         <div>
                           <span style={{fontSize:14,fontWeight:700,color:col.color}}>Category {selectedCat} — All Editions</span>
-                          <span style={{fontSize:12,color:"#888",marginLeft:10}}>{catEditions.length} editions · sorted by delay (highest first)</span>
+                          <span style={{fontSize:12,color:"#888",marginLeft:10}}>{catEditions.length} editions · grouped by state · sorted by delay</span>
                         </div>
                         <button onClick={()=>setSelectedCat(null)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"#888",lineHeight:1}}>×</button>
                       </div>
-                      <div style={{overflowX:"auto",borderRadius:8,border:"1px solid #eee",background:"#fff"}}>
-                        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                          <thead>
-                            <tr style={{background:"#f8f9fa"}}>
-                              {["#","State","Branch","Edition","Scheduled","Released","Delay/On Time","Reason","Notice"].map(h=>(
-                                <th key={h} style={{padding:"8px 10px",textAlign:"left",fontWeight:600,color:"#555",borderBottom:"2px solid #eee",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {catEditions.length===0&&<tr><td colSpan={9} style={{padding:16,textAlign:"center",color:"#aaa"}}>No editions in this category for current filter.</td></tr>}
-                            {catEditions.map((r,i)=>{
-                              const d=fmtDiff(r.dm); const sc=SC[d.type];
-                              return(
-                                <tr key={i} style={{borderBottom:"1px solid #f0f0f0",background:i%2?"#fafafa":"#fff"}}>
-                                  <td style={{padding:"7px 10px",fontWeight:600,color:col.color,fontSize:11}}>#{i+1}</td>
-                                  <td style={{padding:"7px 10px",fontWeight:500}}>{r.state}</td>
-                                  <td style={{padding:"7px 10px",color:"#555"}}>{r.branch}</td>
-                                  <td style={{padding:"7px 10px",fontWeight:500}}>{r.edition}</td>
-                                  <td style={{padding:"7px 10px",fontFamily:"monospace",fontSize:11}}>{r.st}</td>
-                                  <td style={{padding:"7px 10px",fontFamily:"monospace",fontSize:11}}>{r.rt}</td>
-                                  <td style={{padding:"7px 10px"}}>
-                                    <span style={{background:sc.bg,color:sc.color,border:`1px solid ${sc.bd}`,borderRadius:8,fontSize:10,padding:"3px 8px",fontWeight:600,whiteSpace:"nowrap"}}>{d.label}</span>
-                                  </td>
-                                  <td style={{padding:"7px 10px",color:r.cause?"#854f0b":"#ccc",fontSize:11,maxWidth:200,wordBreak:"break-word",whiteSpace:"pre-wrap",lineHeight:1.4}}>{r.cause||"—"}</td>
-                                  <td style={{padding:"7px 10px"}}>
-                                    {r.dm>0&&<button onClick={()=>setNoticeRecord(r)}
-                                      style={{display:"flex",alignItems:"center",gap:4,padding:"4px 8px",background:"#fff3e0",border:"1px solid #ffb74d",borderRadius:6,color:"#e65100",fontSize:10,cursor:"pointer",fontWeight:500,whiteSpace:"nowrap"}}>
-                                      <i className="ti ti-send" style={{fontSize:11}}></i> Notice
-                                    </button>}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
+                      {sortedStates.map(stateName=>{
+                        const stateEditions=grouped[stateName];
+                        return(
+                          <div key={stateName} style={{marginBottom:16}}>
+                            <div style={{fontSize:13,fontWeight:700,color:col.color,padding:"6px 12px",background:`${col.border}44`,borderRadius:8,marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
+                              <i className="ti ti-map-pin" style={{fontSize:13}}></i> {stateName}
+                              <span style={{fontSize:11,fontWeight:400,color:"#666"}}>({stateEditions.length} editions)</span>
+                            </div>
+                            <div style={{overflowX:"auto",borderRadius:8,border:"1px solid #eee",background:"#fff"}}>
+                              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                                <thead>
+                                  <tr style={{background:"#f8f9fa"}}>
+                                    {["#","Branch","Edition","Scheduled","Released","Delay/On Time","EHO Remark","Reason","Notice"].map(h=>(
+                                      <th key={h} style={{padding:"8px 10px",textAlign:"left",fontWeight:600,color:"#555",borderBottom:"2px solid #eee",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {stateEditions.map((r,i)=>{
+                                    globalIdx++;
+                                    const d=fmtDiff(r.dm); const sc=SC[d.type];
+                                    return(
+                                      <tr key={i} style={{borderBottom:"1px solid #f0f0f0",background:i%2?"#fafafa":"#fff"}}>
+                                        <td style={{padding:"7px 10px",fontWeight:600,color:col.color,fontSize:11}}>#{globalIdx}</td>
+                                        <td style={{padding:"7px 10px",color:"#555"}}>{r.branch}</td>
+                                        <td style={{padding:"7px 10px",fontWeight:500}}>{r.edition}</td>
+                                        <td style={{padding:"7px 10px",fontFamily:"monospace",fontSize:11}}>{r.st}</td>
+                                        <td style={{padding:"7px 10px",fontFamily:"monospace",fontSize:11}}>{r.rt}</td>
+                                        <td style={{padding:"7px 10px"}}>
+                                          <span style={{background:sc.bg,color:sc.color,border:`1px solid ${sc.bd}`,borderRadius:8,fontSize:10,padding:"3px 8px",fontWeight:600,whiteSpace:"nowrap"}}>{d.label}</span>
+                                        </td>
+                                        <td style={{padding:"7px 10px",fontSize:11}}>
+                                          {(()=>{const val=(r.delayOntime||"").trim().toLowerCase().replace(/[\s\/\-_]/g,""); return val.includes("ontime")?<span style={{background:"#e6f1fb",color:"#185fa5",padding:"2px 7px",borderRadius:8,fontSize:10,fontWeight:500}}>On Time</span>:<span style={{color:"#ccc"}}>—</span>;})()}
+                                        </td>
+                                        <td style={{padding:"7px 10px",color:r.cause?"#854f0b":"#ccc",fontSize:11,maxWidth:200,wordBreak:"break-word",whiteSpace:"pre-wrap",lineHeight:1.4}}>{r.cause||"—"}</td>
+                                        <td style={{padding:"7px 10px"}}>
+                                          {r.dm>0&&<button onClick={()=>setNoticeRecord(r)}
+                                            style={{display:"flex",alignItems:"center",gap:4,padding:"4px 8px",background:"#fff3e0",border:"1px solid #ffb74d",borderRadius:6,color:"#e65100",fontSize:10,cursor:"pointer",fontWeight:500,whiteSpace:"nowrap"}}>
+                                            <i className="ti ti-send" style={{fontSize:11}}></i> Notice
+                                          </button>}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })()}
