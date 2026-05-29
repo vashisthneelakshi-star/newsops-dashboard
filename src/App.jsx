@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 
 // ── Google Sheet Config ──────────────────────────────────────────
 const SHEET_ID = "1Iv3T-ah2Ed2euConb8_cxgF4nyX-BuXmbqoYM1F5zFQ";
@@ -145,15 +145,18 @@ function LoginScreen({ onLogin }) {
   const [showPass, setShowPass] = useState(false);
 
   const handleLogin = () => {
-    const user = USERS.find(u => u.username.toLowerCase() === username.trim().toLowerCase() && u.password === password.trim());
+    const user = USERS.find(u =>
+      u.username.toLowerCase() === username.trim().toLowerCase() &&
+      u.password === password.trim()
+    );
     if (user) { onLogin(user); }
-    else { setError("Invalid username or password. Please try again."); }
+    else { setError("Invalid username or password."); }
   };
 
   return (
     <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#1a237e 0%,#185fa5 60%,#0288d1 100%)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <div style={{background:"#fff",borderRadius:20,padding:"40px 36px",maxWidth:400,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-        {/* Logo/Header */}
         <div style={{textAlign:"center",marginBottom:32}}>
           <div style={{width:64,height:64,background:"linear-gradient(135deg,#1a237e,#185fa5)",borderRadius:16,margin:"0 auto 16px",display:"flex",alignItems:"center",justifyContent:"center"}}>
             <i className="ti ti-news" style={{fontSize:32,color:"#fff"}}></i>
@@ -162,45 +165,43 @@ function LoginScreen({ onLogin }) {
           <div style={{fontSize:13,color:"#888"}}>Print Media Operations Dashboard</div>
         </div>
 
-        {/* Form */}
         <div style={{marginBottom:16}}>
           <label style={{fontSize:12,fontWeight:600,color:"#555",display:"block",marginBottom:6}}>Username</label>
-          <input
-            type="text" value={username} onChange={e=>{setUsername(e.target.value);setError("");}}
+          <input type="text" value={username}
+            onChange={e=>{setUsername(e.target.value);setError("");}}
             onKeyDown={e=>e.key==="Enter"&&handleLogin()}
             placeholder="Enter username"
-            style={{width:"100%",padding:"10px 14px",border:"1.5px solid #e0e0e0",borderRadius:10,fontSize:14,outline:"none",transition:"border .2s"}}
-          />
+            style={{width:"100%",padding:"10px 14px",border:"1.5px solid #e0e0e0",borderRadius:10,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
         </div>
+
         <div style={{marginBottom:20}}>
           <label style={{fontSize:12,fontWeight:600,color:"#555",display:"block",marginBottom:6}}>Password</label>
           <div style={{position:"relative"}}>
-            <input
-              type={showPass?"text":"password"} value={password} onChange={e=>{setPassword(e.target.value);setError("");}}
+            <input type={showPass?"text":"password"} value={password}
+              onChange={e=>{setPassword(e.target.value);setError("");}}
               onKeyDown={e=>e.key==="Enter"&&handleLogin()}
               placeholder="Enter password"
-              style={{width:"100%",padding:"10px 14px",border:"1.5px solid #e0e0e0",borderRadius:10,fontSize:14,outline:"none",paddingRight:44}}
-            />
-            <button onClick={()=>setShowPass(p=>!p)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#aaa",fontSize:16}}>
+              style={{width:"100%",padding:"10px 44px 10px 14px",border:"1.5px solid #e0e0e0",borderRadius:10,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+            <button onClick={()=>setShowPass(p=>!p)}
+              style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#aaa",fontSize:16,padding:0}}>
               <i className={`ti ${showPass?"ti-eye-off":"ti-eye"}`}></i>
             </button>
           </div>
         </div>
 
-        {error && <div style={{background:"#fff0f0",border:"1px solid #f09595",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#a32d2d",marginBottom:16}}>{error}</div>}
+        {error&&<div style={{background:"#fff0f0",border:"1px solid #f09595",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#a32d2d",marginBottom:16}}>{error}</div>}
 
         <button onClick={handleLogin}
-          style={{width:"100%",padding:"12px",background:"linear-gradient(135deg,#1a237e,#185fa5)",color:"#fff",border:"none",borderRadius:10,fontSize:15,fontWeight:600,cursor:"pointer",letterSpacing:"0.3px"}}>
-          Sign In
+          style={{width:"100%",padding:"12px",background:"linear-gradient(135deg,#1a237e,#185fa5)",color:"#fff",border:"none",borderRadius:10,fontSize:15,fontWeight:600,cursor:"pointer"}}>
+          Sign In →
         </button>
 
-        {/* Hint */}
         <div style={{marginTop:20,padding:"12px 14px",background:"#f8f9fa",borderRadius:10,fontSize:11,color:"#888"}}>
           <div style={{fontWeight:600,marginBottom:6,color:"#555"}}>Available Logins:</div>
           {USERS.map(u=>(
-            <div key={u.username} style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
+            <div key={u.username} style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
               <span style={{fontWeight:500,color:"#333"}}>{u.username}</span>
-              <span style={{color:"#aaa"}}>{u.label}</span>
+              <span style={{color:"#aaa"}}>{u.label} access</span>
             </div>
           ))}
         </div>
@@ -208,6 +209,7 @@ function LoginScreen({ onLogin }) {
     </div>
   );
 }
+
 
 function CustomRangePicker({from,to,onChange}){
   return(<span style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
@@ -326,7 +328,13 @@ export default function App(){
 
   useEffect(()=>{fetchSheet(); const iv=setInterval(fetchSheet,5*60*1000); return()=>clearInterval(iv);},[fetchSheet]);
 
-  const states=useMemo(()=>["All",...new Set(data.map(d=>d.state))],[data]);
+  // Filter data by user role
+  const userData=useMemo(()=>{
+    if(!currentUser||currentUser.role==="admin")return data;
+    return data.filter(r=>matchesUserState(r.state,currentUser.states));
+  },[data,currentUser]);
+
+  const states=useMemo(()=>["All",...new Set(userData.map(d=>d.state))],[userData]);
   const branches=useMemo(()=>{const b=userData.filter(d=>selState==="All"||d.state===selState); return["All",...new Set(b.map(d=>d.branch))];},[userData,selState]);
 
   const base=useMemo(()=>{
@@ -434,7 +442,7 @@ export default function App(){
   // Show login screen if not authenticated
   if(!currentUser){return <LoginScreen onLogin={(user)=>setCurrentUser(user)}/>;}
 
-  if(loading&&data.length===0){return(
+  if(loading&&userData.length===0){return(
     <div style={{minHeight:"100vh",background:"#f0f4f8",display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{textAlign:"center",padding:40}}>
         <div style={{width:44,height:44,border:"3px solid #e0e0e0",borderTop:"3px solid #185fa5",borderRadius:"50%",margin:"0 auto 16px",animation:"spin 1s linear infinite"}}></div>
@@ -531,7 +539,7 @@ export default function App(){
           </div>
         </div>
 
-        {data.length===0&&!loading&&(
+        {userData.length===0&&!loading&&(
           <div style={{background:"#fff",borderRadius:12,padding:"48px 20px",textAlign:"center",color:"#aaa",boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
             <i className="ti ti-table-off" style={{fontSize:52,display:"block",marginBottom:12}}></i>
             <div style={{fontSize:16,fontWeight:500,marginBottom:8,color:"#888"}}>No Data in Google Sheet</div>
@@ -540,7 +548,7 @@ export default function App(){
           </div>
         )}
 
-        {data.length>0&&(<>
+        {userData.length>0&&(<>
 
           {/* ── KPI CARDS ── */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:16}}>
