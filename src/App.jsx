@@ -6,6 +6,51 @@ const SHEET_NAME = "Sheet1";
 const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAME}`;
 const SENDER_EMAIL = "bhuwan.jain@in.patrika.com";
 
+// ── Delay Category Keywords ──────────────────────────────────────
+const DELAY_CATEGORIES = {
+  advt: {
+    label: "Advertisement",
+    icon: "ti-ad",
+    color: "#7b1fa2",
+    bg: "#f3e5f5",
+    border: "#ce93d8",
+    keywords: ["advt","advert","advertisement","ad ","ads ","advtisement","विज्ञापन","विज्ञापन","ad late","ad hold","ad dummy","adv ","adv.","advertisement late","advertisement hold"],
+  },
+  dummy: {
+    label: "Dummy / Plate",
+    icon: "ti-layers",
+    color: "#1565c0",
+    bg: "#e3f2fd",
+    border: "#90caf9",
+    keywords: ["dummy","plate","प्लेट","डमी","plate late","plate problem","plate issue","plate making","burn","plate burn","cylinder","dum ","plat "],
+  },
+  nics: {
+    label: "NICS / Page Supply",
+    icon: "ti-network",
+    color: "#e65100",
+    bg: "#fff3e0",
+    border: "#ffb74d",
+    keywords: ["nics","page late","page supply","page from","page received","page mil","page nahi","पेज","jaipur se","jaip se","jpr se","jpr ","j.p.r","page jaipur","sent late","received late","not received","page not","file late","file not"],
+  },
+  technical: {
+    label: "Technical Issue",
+    icon: "ti-tool",
+    color: "#b71c1c",
+    bg: "#ffebee",
+    border: "#ef9a9a",
+    keywords: ["technical","machine","press","power","light","electricity","बिजली","मशीन","generator","server","network","system","breakdown","fault","error","ink","inking","roller","web break","paper","jam","mechanical"],
+  },
+};
+
+function detectDelayCat(cause) {
+  if (!cause) return null;
+  const lower = cause.toLowerCase();
+  for (const [key, cat] of Object.entries(DELAY_CATEGORIES)) {
+    if (cat.keywords.some(kw => lower.includes(kw.toLowerCase()))) return key;
+  }
+  return null;
+}
+
 // ── Login Config ─────────────────────────────────────────────────
 const USERS = [
   { username: "Admin",  password: "Admin@2024", role: "admin", label: "Admin",      states: null },
@@ -313,6 +358,8 @@ export default function App(){
   const [noticeRecord,setNoticeRecord]=useState(null);
   const [selectedCat,setSelectedCat]=useState(null);
   const [currentUser,setCurrentUser]=useState(null);
+  const [showEHO,setShowEHO]=useState(false);
+  const [activeDelayCat,setActiveDelayCat]=useState(null);
 
   const fetchSheet=useCallback(async()=>{
     setLoading(true); setSyncError(false);
@@ -424,6 +471,17 @@ export default function App(){
     base.filter(r=>r.dm>0&&r.cause).forEach(r=>{m[r.cause]=(m[r.cause]||0)+1;});
     const t=Object.values(m).reduce((s,v)=>s+v,0);
     return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([c,n])=>({c,n,pct:t?Math.round(n/t*100):0}));
+  },[base]);
+
+  // Delay category summary
+  const delayCatSummary=useMemo(()=>{
+    const result={};
+    Object.keys(DELAY_CATEGORIES).forEach(k=>result[k]=[]);
+    base.filter(r=>r.dm>0).forEach(r=>{
+      const cat=detectDelayCat(r.cause);
+      if(cat)result[cat].push(r);
+    });
+    return result;
   },[base]);
 
   const exportCSV=()=>{
@@ -568,7 +626,87 @@ export default function App(){
             ))}
           </div>
 
-          {/* ── SECTION TABS ── */}
+
+          {/* ── DELAY CATEGORY SMART ICONS ── */}
+          <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:16,alignItems:"center"}}>
+            <span style={{fontSize:11,color:"#888",fontWeight:500,marginRight:4}}>Smart Delay Analysis:</span>
+            {Object.entries(DELAY_CATEGORIES).map(([key,cat])=>{
+              const items=delayCatSummary[key]||[];
+              const isActive=activeDelayCat===key;
+              return(
+                <button key={key} onClick={()=>setActiveDelayCat(isActive?null:key)}
+                  style={{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",background:isActive?cat.color:cat.bg,border:`1.5px solid ${isActive?cat.color:cat.border}`,borderRadius:20,cursor:"pointer",transition:"all .2s"}}>
+                  <i className={`ti ${cat.icon}`} style={{fontSize:14,color:isActive?"#fff":cat.color}}></i>
+                  <span style={{fontSize:12,fontWeight:600,color:isActive?"#fff":cat.color}}>{cat.label}</span>
+                  <span style={{fontSize:11,background:isActive?"rgba(255,255,255,0.3)":cat.color,color:"#fff",padding:"1px 7px",borderRadius:10,fontWeight:700,minWidth:20,textAlign:"center"}}>{items.length}</span>
+                </button>
+              );
+            })}
+            {/* EHO Toggle — Admin only */}
+            {currentUser&&currentUser.role==="admin"&&(
+              <button onClick={()=>setShowEHO(p=>!p)}
+                style={{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",background:showEHO?"#37474f":"#f5f5f5",border:`1.5px solid ${showEHO?"#37474f":"#e0e0e0"}`,borderRadius:20,cursor:"pointer",marginLeft:"auto",transition:"all .2s"}}>
+                <i className="ti ti-eye" style={{fontSize:14,color:showEHO?"#fff":"#888"}}></i>
+                <span style={{fontSize:12,fontWeight:500,color:showEHO?"#fff":"#888"}}>{showEHO?"Hide EHO Remark":"Show EHO Remark"}</span>
+              </button>
+            )}
+          </div>
+
+          {/* ── SMART DELAY CATEGORY DRILL-DOWN ── */}
+          {activeDelayCat&&(()=>{
+            const cat=DELAY_CATEGORIES[activeDelayCat];
+            const items=delayCatSummary[activeDelayCat]||[];
+            return(
+              <div style={{background:cat.bg,border:`2px solid ${cat.border}`,borderRadius:12,padding:16,marginBottom:16}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <i className={`ti ${cat.icon}`} style={{fontSize:20,color:cat.color}}></i>
+                    <div>
+                      <div style={{fontSize:14,fontWeight:700,color:cat.color}}>{cat.label} Delays</div>
+                      <div style={{fontSize:12,color:"#888"}}>{items.length} editions delayed due to {cat.label.toLowerCase()} issues</div>
+                    </div>
+                  </div>
+                  <button onClick={()=>setActiveDelayCat(null)} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#888"}}>×</button>
+                </div>
+                <div style={{overflowX:"auto",borderRadius:8,border:"1px solid #eee",background:"#fff"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                    <thead>
+                      <tr style={{background:"#f8f9fa"}}>
+                        {["#","State","Branch","Edition","Delay/On Time","Reason","Notice"].map(h=>(
+                          <th key={h} style={{padding:"8px 10px",textAlign:"left",fontWeight:600,color:"#555",borderBottom:"2px solid #eee",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...items].sort((a,b)=>b.dm-a.dm).map((r,i)=>{
+                        const d=fmtDiff(r.dm); const sc=SC[d.type];
+                        return(
+                          <tr key={i} style={{borderBottom:"1px solid #f0f0f0",background:i%2?"#fafafa":"#fff"}}>
+                            <td style={{padding:"7px 10px",fontWeight:600,color:cat.color,fontSize:11}}>#{i+1}</td>
+                            <td style={{padding:"7px 10px",fontWeight:500}}>{r.state}</td>
+                            <td style={{padding:"7px 10px",color:"#555"}}>{r.branch}</td>
+                            <td style={{padding:"7px 10px"}}>{r.edition}</td>
+                            <td style={{padding:"7px 10px"}}>
+                              <span style={{background:sc.bg,color:sc.color,border:`1px solid ${sc.bd}`,borderRadius:8,fontSize:10,padding:"3px 8px",fontWeight:600,whiteSpace:"nowrap"}}>{d.label}</span>
+                            </td>
+                            <td style={{padding:"7px 10px",color:"#854f0b",fontSize:11,maxWidth:250,wordBreak:"break-word",whiteSpace:"pre-wrap",lineHeight:1.4}}>{r.cause||"—"}</td>
+                            <td style={{padding:"7px 10px"}}>
+                              <button onClick={()=>setNoticeRecord(r)}
+                                style={{display:"flex",alignItems:"center",gap:4,padding:"4px 8px",background:"#fff3e0",border:"1px solid #ffb74d",borderRadius:6,color:"#e65100",fontSize:10,cursor:"pointer",fontWeight:500,whiteSpace:"nowrap"}}>
+                                <i className="ti ti-send" style={{fontSize:11}}></i> Notice
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
+
+                    {/* ── SECTION TABS ── */}
           <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,.06)",overflow:"hidden"}}>
             <div style={{display:"flex",borderBottom:"1px solid #eee",overflowX:"auto"}}>
               {[["overview","📊 Overview"],["report","📋 Full Report"],["states","🗺️ State Overview"],["top10","🏆 Top 10 Lists"],["causes","🔍 Delay Analysis"]].map(([k,l])=>(
@@ -759,13 +897,13 @@ export default function App(){
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:900}}>
                     <thead>
                       <tr style={{background:"#f8f9fa"}}>
-                        {["State","Branch","Edition","Cat.","Pullout","Scheduled","Released","Delay/On Time","EHO Remark","Reason","Notice"].map(h=>(
+                        {["State","Branch","Edition","Cat.","Pullout","Scheduled","Released","Delay/On Time",...(showEHO&&currentUser?.role==="admin"?["EHO Remark"]:[]),"Reason","Notice"].map(h=>(
                           <th key={h} style={{padding:"9px 10px",textAlign:"left",fontWeight:600,color:"#555",borderBottom:"2px solid #eee",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {base.length===0&&<tr><td colSpan={11} style={{padding:24,textAlign:"center",color:"#aaa"}}>No data for this selection.</td></tr>}
+                      {base.length===0&&<tr><td colSpan={showEHO&&currentUser?.role==="admin"?11:10} style={{padding:24,textAlign:"center",color:"#aaa"}}>No data for this selection.</td></tr>}
                       {base.map((r,i)=>{
                         const d=fmtDiff(r.dm); const sc=SC[d.type];
                         const col=CAT_COLORS[r.category];
